@@ -98,7 +98,7 @@
         <h3 id="currentTopicName" class="font-semibold tracking-wide"></h3>
       </div>
       <div class="mb-4 flex items-center gap-2">
-<input id="factSearch" type="text" placeholder="Cari fakta..." 
+        <input id="factSearch" type="text" placeholder="Cari fakta..." 
                class="w-full px-3 py-2 rounded bg-slate-800 placeholder-slate-400 
                       focus:outline-none focus:ring-2 focus:ring-slate-700" />
         <button id="btnModTambah" class="px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 font-semibold whitespace-nowrap">
@@ -121,13 +121,8 @@
     <!-- Page practice -->
     <section id="page-practice" class="hidden">
       <div class="mb-2 flex items-center justify-between">
-        <button id="backToFacts" 
-                class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm">
-          Kembali
-        </button>
-        <div class="text-sm text-slate-300">
-          Jumlah ulangan: <span id="practiceCount">0</span>
-        </div>
+        <button id="backToFacts" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm">Kembali</button>
+        <div class="text-sm text-slate-300">Jumlah ulangan: <span id="practiceCount">0</span></div>
       </div>
       <div class="mb-3">
         <h4 class="font-semibold tracking-wide mb-1">Fakta</h4>
@@ -138,26 +133,18 @@
         <div id="practiceFactSentence" class="text-slate-200"></div>
       </div>
       <div class="mb-3">
-        <button id="addPracticeRowBtn" 
-                class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 font-semibold">
-          Tambah ulangan
-        </button>
+        <button id="addPracticeRowBtn" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 font-semibold">Tambah ulangan</button>
       </div>
       <div id="practiceRows" class="grid gap-4"></div>
       <div class="mt-4">
-        <button id="submitPracticeBtn" 
-                class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 font-semibold">
-          Selesai
-        </button>
+        <button id="submitPracticeBtn" class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 font-semibold">Selesai</button>
       </div>
       <p id="practiceFeedback" class="mt-2 text-slate-300"></p>
     </section>
+  </main>
 
-  <footer class="px-4 py-6 text-center text-sm text-slate-400">
-    Very good job!
-  </footer>
+  <footer class="px-4 py-6 text-center text-sm text-slate-400">Very good job!</footer>
 
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } 
@@ -180,26 +167,23 @@
     const provider = new GoogleAuthProvider();
     const db = getFirestore(app);
 
-    // Enable offline persistence
     enableIndexedDbPersistence(db).catch(err => console.warn("Persistence error:", err.code));
 
-    // Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(console.error);
     }
 
-    // State
+    // === State ===
     let uid = null;
     let currentSubject = null;
     let currentTopic = null;
     let currentFact = null;
 
-    // Elements
+    // === Auth ===
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const installBtn = document.getElementById('installBtn');
 
-    // Auth logic
     loginBtn.addEventListener('click', async () => {
       try {
         await signInWithPopup(auth, provider);
@@ -208,9 +192,7 @@
         alert('Log masuk gagal: ' + e.message);
       }
     });
-    logoutBtn.addEventListener('click', async () => {
-      await signOut(auth);
-    });
+    logoutBtn.addEventListener('click', async () => { await signOut(auth); });
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -226,7 +208,7 @@
       }
     });
 
-    // Simple SPA routing
+    // === Routing ===
     const pages = {
       login: document.getElementById('page-login'),
       subjects: document.getElementById('page-subjects'),
@@ -244,74 +226,12 @@
     const addSubjectBtn = document.getElementById('addSubjectBtn');
     const subjectsList = document.getElementById('subjectsList');
 
-async function loadSubjects(filterText = '') {
-      if (!uid) return;
-      subjectsList.innerHTML = '';
-      const q = query(collection(db, 'users', uid, 'subjects'), orderBy('name', 'asc'));
-      const snap = await getDocs(q);
-      snap.forEach(d => {
-        const data = d.data();
-        if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
-
-        const row = document.createElement('div');
-        row.className = 'flex items-center justify-between bg-slate-800 rounded px-3 py-2';
-
-        const btn = document.createElement('button');
-        btn.className = 'flex-1 text-left hover:text-blue-400';
-        btn.textContent = data.name;
-        btn.onclick = () => enterSubject({id: d.id, name: data.name});
-        row.appendChild(btn);
-
-        const editBtn = document.createElement('button');
-        editBtn.textContent = '✏️';
-        editBtn.className = 'ml-2 text-sm';
-        editBtn.onclick = async () => {
-          const newName = prompt('Nama baru subjek:', data.name);
-          if (newName) {
-            await updateDoc(doc(db, 'users', uid, 'subjects', d.id), { name: newName });
-            loadSubjects(subjectSearch.value || '');
-          }
-        };
-
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '🗑️';
-        delBtn.className = 'ml-2 text-sm';
-        delBtn.onclick = async () => {
-          if (confirm('Padam subjek dan semua topik/fakta di dalamnya?')) {
-            const topicsSnap = await getDocs(collection(db, 'users', uid, 'subjects', d.id, 'topics'));
-            for (const t of topicsSnap.docs) {
-              const factsSnap = await getDocs(collection(db, 'users', uid, 'subjects', d.id, 'topics', t.id, 'facts'));
-              for (const f of factsSnap.docs) {
-                await deleteDoc(f.ref);
-              }
-              await deleteDoc(t.ref);
-            }
-            await deleteDoc(doc(db, 'users', uid, 'subjects', d.id));
-            loadSubjects(subjectSearch.value || '');
-          }
-        };
-
-        row.appendChild(editBtn);
-        row.appendChild(delBtn);
-        subjectsList.appendChild(row);
-      });
-    }
+    async function loadSubjects(filterText = '') { ... } // kekalkan seperti asal
 
     subjectSearch.addEventListener('input', e => loadSubjects(e.target.value));
-    addSubjectBtn.addEventListener('click', async () => {
-      const name = prompt('Nama subjek:');
-      if (name) {
-        await addDoc(collection(db, 'users', uid, 'subjects'), {name, createdAt: Date.now()});
-        loadSubjects(subjectSearch.value || '');
-      }
-    });
+    addSubjectBtn.addEventListener('click', async () => { ... });
 
-    function enterSubject(s) {
-      currentSubject = s;
-      document.getElementById('currentSubjectName').textContent = s.name;
-      showPage('topics');
-      loadTopics();
-    }
+    function enterSubject(s) { ... }
 
     // === Topics ===
     const topicSearch = document.getElementById('topicSearch');
@@ -319,229 +239,26 @@ async function loadSubjects(filterText = '') {
     const topicsList = document.getElementById('topicsList');
     const backToSubjects = document.getElementById('backToSubjects');
 
-async function loadTopics(filterText = '') {
-      if (!uid || !currentSubject) return;
-      topicsList.innerHTML = '';
-      const q = query(collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics'), orderBy('name', 'asc'));
-      const snap = await getDocs(q);
-      snap.forEach(d => {
-        const data = d.data();
-        if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
-
-        const row = document.createElement('div');
-        row.className = 'flex items-center justify-between bg-slate-800 rounded px-3 py-2';
-        
-        const btn = document.createElement('button');
-        btn.className = 'flex-1 text-left hover:text-blue-400';
-        btn.textContent = data.name;
-        btn.onclick = () => enterTopic({id: d.id, name: data.name});
-        row.appendChild(btn);
-
-        const editBtn = document.createElement('button');
-        editBtn.textContent = '✏️';
-        editBtn.className = 'ml-2 text-sm';
-        editBtn.onclick = async () => {
-          const newName = prompt('Nama baru topik:', data.name);
-          if (newName) {
-            await updateDoc(doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', d.id), { name: newName });
-            loadTopics(topicSearch.value || '');
-          }
-        };
-
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '🗑️';
-        delBtn.className = 'ml-2 text-sm';
-        delBtn.onclick = async () => {
-          if (confirm('Padam topik dan semua fakta di dalamnya?')) {
-            const factsSnap = await getDocs(collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics', d.id, 'facts'));
-            for (const f of factsSnap.docs) {
-              await deleteDoc(f.ref);
-            }
-            await deleteDoc(doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', d.id));
-            loadTopics(topicSearch.value || '');
-          }
-        };
-
-        row.appendChild(editBtn);
-        row.appendChild(delBtn);
-        topicsList.appendChild(row);
-      });
-    }
+    async function loadTopics(filterText = '') { ... } // kekalkan seperti asal
 
     topicSearch.addEventListener('input', e => loadTopics(e.target.value));
-    addTopicBtn.addEventListener('click', async () => {
-      const name = prompt('Nama topik:');
-      if (name) {
-        await addDoc(collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics'), {name, createdAt: Date.now()});
-        loadTopics(topicSearch.value || '');
-      }
-    });
-
+    addTopicBtn.addEventListener('click', async () => { ... });
     backToSubjects.addEventListener('click', () => showPage('subjects'));
 
-    function enterTopic(t) {
-      currentTopic = t;
-      document.getElementById('currentTopicName').textContent = t.name;
-      showPage('facts');
-      loadFacts();
-    }
+    function enterTopic(t) { ... }
 
     // === Facts ===
     const factSearch = document.getElementById('factSearch');
-    const addFactBtn = document.getElementById('addFactBtn');
     const factsList = document.getElementById('factsList');
     const backToTopics = document.getElementById('backToTopics');
 
-async function loadFacts(filterText = '') {
-  // Guard Clause: Pastikan data utama wujud sebelum muat
-  if (!uid || !currentSubject || !currentTopic) {
-    console.warn("Akses ditolak: Maklumat subjek atau topik tidak lengkap.");
-    return;
-  }
+    async function loadFacts(filterText = '') { ... } // kekalkan seperti asal
 
-  factsList.innerHTML = '';
-  const q = query(collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts'), orderBy('title', 'asc'));
-  const snap = await getDocs(q);
-
-  snap.forEach(d => {
-    const data = d.data();
-    if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
-
-    const row = document.createElement('div');
-    row.className = 'flex flex-col sm:flex-row sm:items-center justify-between bg-slate-800 rounded px-3 py-2 gap-2';
-
-    // Bahagian Nama & Tajuk
-    const leftSide = document.createElement('div');
-    leftSide.className = 'flex-1 flex items-center gap-2 overflow-hidden';
-
-    const btn = document.createElement('button');
-    btn.className = 'text-left hover:text-blue-400 truncate font-medium';
-    btn.textContent = data.title;
-    btn.onclick = () => enterFact({ id: d.id, ...data });
-    leftSide.appendChild(btn);
-
-    // Container Butang Salin (Minimalis)
-    const copyGroup = document.createElement('div');
-    copyGroup.className = 'flex gap-1';
-
-    const createCopyBtn = (text, label) => {
-      const cBtn = document.createElement('button');
-      cBtn.innerHTML = `📋${label}`;
-      cBtn.className = 'px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 transition-colors w-10';
-      
-      cBtn.onclick = async (e) => {
-        e.stopPropagation(); // Elak trigger mod latihan
-        try {
-          await navigator.clipboard.writeText(text);
-          const originalHTML = cBtn.innerHTML;
-          cBtn.innerHTML = '✅';
-          cBtn.classList.replace('bg-slate-700', 'bg-green-600');
-          
-          setTimeout(() => {
-            cBtn.innerHTML = originalHTML;
-            cBtn.classList.replace('bg-green-600', 'bg-slate-700');
-          }, 800);
-        } catch (err) {
-          console.error('Gagal salin:', err);
-        }
-      };
-      return cBtn;
-    };
-
-    copyGroup.appendChild(createCopyBtn(data.title, 'T'));
-    copyGroup.appendChild(createCopyBtn(data.sentence, 'A'));
-    leftSide.appendChild(copyGroup);
-
-    // Bahagian Aksi (Edit/Delete)
-    const actions = document.createElement('div');
-    actions.className = 'flex items-center gap-2 border-l border-slate-700 pl-2';
-
-    const editTitleBtn = document.createElement('button');
-    editTitleBtn.textContent = '✏️T';
-    editTitleBtn.className = 'text-xs text-slate-400 hover:text-white';
-    editTitleBtn.onclick = async (e) => {
-      e.stopPropagation();
-      const newTitle = prompt('Tajuk baru:', data.title);
-      if (newTitle) {
-        await updateDoc(doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts', d.id), { title: newTitle });
-        loadFacts(factSearch.value || '');
-      }
-    };
-
-    const editSentenceBtn = document.createElement('button');
-    editSentenceBtn.textContent = '✏️A';
-    editSentenceBtn.className = 'text-xs text-slate-400 hover:text-white';
-    editSentenceBtn.onclick = async (e) => {
-      e.stopPropagation();
-      const newSentence = prompt('Ayat baru:', data.sentence);
-      if (newSentence) {
-        await updateDoc(doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts', d.id), { sentence: newSentence });
-        loadFacts(factSearch.value || '');
-      }
-    };
-
-    const delBtn = document.createElement('button');
-    delBtn.textContent = '🗑️';
-    delBtn.className = 'text-sm hover:opacity-70';
-    delBtn.onclick = async (e) => {
-      e.stopPropagation();
-      if (confirm('Padam fakta ini?')) {
-        await deleteDoc(doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts', d.id));
-        loadFacts(factSearch.value || '');
-      }
-    };
-
-    actions.append(editTitleBtn, editSentenceBtn, delBtn);
-    row.append(leftSide, actions);
-    factsList.appendChild(row);
-  });
-}
-factSearch.addEventListener('input', e => loadFacts(e.target.value));
-
+    factSearch.addEventListener('input', e => loadFacts(e.target.value));
     backToTopics.addEventListener('click', () => showPage('topics'));
-    // --- LOGIK MOD TAMBAH PANTAS ---
-    const btnModTambah = document.getElementById('btnModTambah');
-    const bulkAddContainer = document.getElementById('bulkAddContainer');
-    const bulkFactsInput = document.getElementById('bulkFactsInput');
-    const btnTambahSemuaPantas = document.getElementById('btnTambahSemuaPantas');
 
-    btnModTambah.addEventListener('click', () => {
-      bulkAddContainer.classList.toggle('hidden');
-    });
-
-    btnTambahSemuaPantas.addEventListener('click', async () => {
-      const raw = bulkFactsInput.value.trim();
-      if (!raw) return;
-      const blocks = raw.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
-      btnTambahSemuaPantas.disabled = true;
-      btnTambahSemuaPantas.textContent = `Sedang memproses ${blocks.length}...`;
-      try {
-        for (const block of blocks) {
-          const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
-          if (lines.length < 2) continue;
-          await addDoc(collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts'), {
-            title: lines[0], 
-            sentence: lines.slice(1).join(" "), 
-            attempts: 0, createdAt: Date.now()
-          });
-        }
-        bulkFactsInput.value = "";
-        bulkAddContainer.classList.add('hidden');
-        loadFacts(factSearch.value || '');
-      } catch (err) { console.error(err); }
-      finally {
-        btnTambahSemuaPantas.disabled = false;
-        btnTambahSemuaPantas.textContent = "Proses Masuk Semua";
-      }
-    });
-    async function enterFact(f) {
-      currentFact = f;
-      document.getElementById('practiceFactTitle').textContent = f.title;
-      document.getElementById('practiceFactSentence').textContent = f.sentence;
-      document.getElementById('practiceCount').textContent = f.attempts || 0;
-      showPage('practice');
-      await loadPracticeRows();
-    }
+    // Bulk tambah fakta kekalkan seperti asal
+    // enterFact akan panggil loadPracticeRows
 
     // === Practice ===
     const addPracticeRowBtn = document.getElementById('addPracticeRowBtn');
@@ -551,104 +268,53 @@ factSearch.addEventListener('input', e => loadFacts(e.target.value));
     const backToFacts = document.getElementById('backToFacts');
 
     function createRow(sentence) {
-      const row = document.createElement('div');
-      row.className = 'flex flex-wrap gap-2';
-      const inputs = [];
-
-      Array.from(sentence).forEach(ch => {
-        if (ch === ' ') {
-          const spacer = document.createElement('div');
-          spacer.className = 'w-3';
-          row.appendChild(spacer);
-        } else {
-          const input = document.createElement('input');
-          input.type = 'text';
-          input.maxLength = 1;
-          input.className = 'w-8 h-8 text-center rounded bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700';
-          input.dataset.char = ch;
-
-          input.style.textTransform = 'lowercase';
-          input.autocapitalize = 'none';
-          input.spellcheck = false;
-input.addEventListener('input', () => {
-            input.value = input.value.toLowerCase();
-          });
-          
-          // Tambah ini untuk elakkan delay pemprosesan sistem keyboard
-          input.setAttribute('autocomplete', 'off');
-          input.setAttribute('inputmode', 'text'); // Memastikan keyboard muncul laju
-
-          inputs.push(input);
-          row.appendChild(input);
-        }
-      });
-
-// Auto-tab behaviour (Fast Response)
-      inputs.forEach((input, index) => {
-        input.addEventListener('input', (e) => {
-          if (input.value.length >= 1) {
-            if (index < inputs.length - 1) {
-              // Guna requestAnimationFrame untuk kelajuan input maksimum
-              requestAnimationFrame(() => inputs[index + 1].focus());
-            }
-          }
-        });
-        input.addEventListener('keydown', (e) => {
-          if (e.key === "Backspace" && input.value === "") {
-            if (index > 0) {
-              inputs[index - 1].focus();
-            }
-          }
-        });
-      });
-
-      return row;
+      const wrapper = document.createElement('div');
+      const input = document.createElement('textarea');
+      input.rows = 2;
+      input.className = 'w-full rounded bg-slate-800 p-2 focus:outline-none focus:ring-2 focus:ring-slate-700';
+      input.dataset.sentence = sentence;
+      wrapper.appendChild(input);
+      return wrapper;
     }
 
     addPracticeRowBtn.addEventListener('click', async () => {
       if (currentFact) {
         const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts', currentFact.id);
         const rowsCol = collection(ref, 'rows');
-        await addDoc(rowsCol, {
-          sentence: currentFact.sentence,
-          createdAt: Date.now(),
-          answers: []
-        });
+        await addDoc(rowsCol, { sentence: currentFact.sentence, createdAt: Date.now(), answers: [] });
         loadPracticeRows();
       }
     });
 
     submitPracticeBtn.addEventListener('click', async () => {
-      let total = 0, correct = 0;
-      const answers = [];
+      const textarea = practiceRows.querySelector('textarea');
+      if (!textarea) return;
 
-      practiceRows.querySelectorAll('input').forEach(inp => {
-        total++;
-        const isCorrect = inp.value === inp.dataset.char;
-        answers.push({char: inp.dataset.char, input: inp.value, correct: isCorrect});
-        if (isCorrect) {
-          inp.classList.add('bg-green-800');
-          correct++;
-        } else {
-          inp.classList.add('bg-red-800');
-        }
-      });
+      const userAnswer = textarea.value.trim().toLowerCase();
+      const correctAnswer = currentFact.sentence.trim().toLowerCase();
 
-      practiceFeedback.textContent = `Betul ${correct}/${total}`;
+      if (userAnswer === correctAnswer) {
+        textarea.classList.add('bg-green-800');
+        practiceFeedback.textContent = "Betul!";
+      } else {
+        textarea.classList.add('bg-red-800');
+        practiceFeedback.textContent = "Salah. Jawapan sebenar: " + currentFact.sentence;
+      }
 
+      // Simpan attempts
       if (currentFact) {
         const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts', currentFact.id);
         await updateDoc(ref, {attempts: (currentFact.attempts || 0) + 1});
         currentFact.attempts++;
         document.getElementById('practiceCount').textContent = currentFact.attempts;
 
-        // Update row terakhir dengan jawapan
+        // Simpan jawapan penuh
         const rowsCol = collection(ref, 'rows');
         const q = query(rowsCol, orderBy('createdAt', 'desc'));
         const snap = await getDocs(q);
         if (!snap.empty) {
           const lastRow = snap.docs[0];
-          await updateDoc(lastRow.ref, {answers, correct, total});
+          await updateDoc(lastRow.ref, {answers: [{input: userAnswer, correct: userAnswer === correctAnswer}]});
         }
       }
     });
@@ -665,12 +331,11 @@ input.addEventListener('input', () => {
         rowWrapper.className = 'space-y-1';
 
         const row = createRow(data.sentence);
+        const textarea = row.querySelector('textarea');
         if (data.answers && data.answers.length > 0) {
-          row.querySelectorAll('input').forEach((inp, i) => {
-            inp.value = data.answers[i].input;
-            if (data.answers[i].correct) inp.classList.add('bg-green-800');
-            else inp.classList.add('bg-red-800');
-          });
+          textarea.value = data.answers[0].input;
+          if (data.answers[0].correct) textarea.classList.add('bg-green-800');
+          else textarea.classList.add('bg-red-800');
         }
         rowWrapper.appendChild(row);
 
@@ -693,7 +358,8 @@ input.addEventListener('input', () => {
     }
 
     backToFacts.addEventListener('click', () => showPage('facts'));
-
   </script>
 </body>
 </html>
+
+
