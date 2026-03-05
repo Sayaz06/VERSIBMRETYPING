@@ -117,18 +117,18 @@
       </div>
       <div class="mb-3">
         <h4 class="font-semibold tracking-wide mb-1">Fakta</h4>
-        <div id="practiceFactTitle" class="text-blue-400 font-bold"></div>
+        <div id="practiceFactTitle" class="text-slate-200"></div>
       </div>
       <div class="mb-3">
         <h4 class="font-semibold tracking-wide mb-1">Ayat</h4>
-        <div id="practiceFactSentence" class="text-slate-200 italic"></div>
+        <div id="practiceFactSentence" class="text-slate-200"></div>
       </div>
       <div class="mb-3">
         <button id="addPracticeRowBtn" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 font-semibold">Tambah ulangan</button>
       </div>
       <div id="practiceRows" class="grid gap-4"></div>
       <div class="mt-4">
-        <button id="submitPracticeBtn" class="px-4 py-2 rounded bg-green-700 hover:bg-green-600 font-semibold">Selesai</button>
+        <button id="submitPracticeBtn" class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 font-semibold">Selesai</button>
       </div>
       <p id="practiceFeedback" class="mt-2 text-slate-300"></p>
     </section>
@@ -360,34 +360,39 @@
         if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
 
         const wrapper = document.createElement('div');
-        wrapper.className = 'bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2';
-        wrapper.innerHTML = `
-          <div>
-            <div class="font-bold text-blue-400 text-lg">${data.title}</div>
-            <div class="text-sm text-slate-300">${data.sentence}</div>
-          </div>
-          <div class="flex gap-2 justify-end">
-            <button class="px-3 py-1 bg-green-700 text-xs rounded btn-latih">📝 Latih</button>
-            <button class="px-2 py-1 bg-slate-700 text-xs rounded btn-edit">✏️</button>
-            <button class="px-2 py-1 bg-red-900 text-xs rounded btn-delete">🗑️</button>
-          </div>
-        `;
+        wrapper.className = 'flex items-start gap-2 bg-slate-800 rounded p-2';
 
-        wrapper.querySelector('.btn-latih').onclick = () => startPractice({id: d.id, ...data});
-        wrapper.querySelector('.btn-edit').onclick = async () => {
-          const nt = prompt('Tajuk baru:', data.title);
-          const ns = prompt('Ayat baru:', data.sentence);
+        const content = document.createElement('div');
+        content.className = 'flex-1 text-left';
+        content.innerHTML = `<div class="font-semibold text-blue-400">${data.title}</div><div class="text-sm text-slate-300">${data.sentence}</div>`;
+        wrapper.appendChild(content);
+
+        const practiceBtn = document.createElement('button');
+        practiceBtn.textContent = '📝';
+        practiceBtn.onclick = () => startPractice({id: d.id, ...data});
+        wrapper.appendChild(practiceBtn);
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️';
+        editBtn.onclick = async () => {
+          const nt = prompt('Edit tajuk:', data.title);
+          const ns = prompt('Edit ayat:', data.sentence);
           if (nt && ns) {
             await updateDoc(d.ref, {title: nt, sentence: ns});
             loadFacts(filterText);
           }
         };
-        wrapper.querySelector('.btn-delete').onclick = async () => {
-          if (confirm('Hapus fakta?')) {
+        wrapper.appendChild(editBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.onclick = async () => {
+          if (confirm('Padam fakta ini?')) {
             await deleteDoc(d.ref);
             loadFacts(filterText);
           }
         };
+        wrapper.appendChild(delBtn);
         factsList.appendChild(wrapper);
       });
     }
@@ -415,7 +420,6 @@
     const practiceRows = document.getElementById('practiceRows');
     const addPracticeRowBtn = document.getElementById('addPracticeRowBtn');
     const submitPracticeBtn = document.getElementById('submitPracticeBtn');
-    const practiceCountSpan = document.getElementById('practiceCount');
 
     backToFacts.addEventListener('click', () => showPage('facts'));
 
@@ -425,23 +429,31 @@
       document.getElementById('practiceFactSentence').textContent = f.sentence;
       document.getElementById('practiceFeedback').textContent = '';
       practiceRows.innerHTML = '';
-      practiceCountSpan.textContent = '0';
+      document.getElementById('practiceCount').textContent = '0';
       showPage('practice');
       addPracticeRow();
     }
 
     function addPracticeRow() {
       const div = document.createElement('div');
-      div.className = 'flex flex-col gap-1';
+      div.className = 'flex items-center gap-2';
       div.innerHTML = `
-        <textarea class="w-full px-3 py-2 rounded bg-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500" 
-                  rows="2" placeholder="Taip semula ayat di atas..."></textarea>
+        <textarea class="flex-1 px-3 py-1 rounded bg-slate-800" rows="2"></textarea>
+        <button class="btn-del-row">🗑️</button>
       `;
+      div.querySelector('.btn-del-row').onclick = () => {
+        div.remove();
+        updatePracticeCount();
+      };
       practiceRows.appendChild(div);
-      practiceCountSpan.textContent = practiceRows.children.length;
+      updatePracticeCount();
     }
 
     addPracticeRowBtn.addEventListener('click', addPracticeRow);
+
+    function updatePracticeCount() {
+      document.getElementById('practiceCount').textContent = practiceRows.children.length;
+    }
 
     submitPracticeBtn.addEventListener('click', () => {
       const inputs = practiceRows.querySelectorAll('textarea');
