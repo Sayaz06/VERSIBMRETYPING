@@ -23,10 +23,7 @@
     }
   </script>
 
-  <!-- Base path untuk GitHub Pages -->
   <base href="/VERSIBMRETYPING/">
-
-  <!-- Manifest & ikon -->
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f172a" />
   <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png" />
@@ -226,12 +223,35 @@
     const addSubjectBtn = document.getElementById('addSubjectBtn');
     const subjectsList = document.getElementById('subjectsList');
 
-    async function loadSubjects(filterText = '') { ... } // kekalkan seperti asal
+    async function loadSubjects(filterText = '') {
+      subjectsList.innerHTML = '';
+      const q = query(collection(db, 'users', uid, 'subjects'), orderBy('createdAt', 'asc'));
+      const snap = await getDocs(q);
+      snap.forEach(d => {
+        const data = d.data();
+        if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
+        const btn = document.createElement('button');
+        btn.textContent = data.name;
+        btn.className = 'px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-left';
+        btn.onclick = () => enterSubject({id: d.id, ...data});
+        subjectsList.appendChild(btn);
+      });
+    }
 
     subjectSearch.addEventListener('input', e => loadSubjects(e.target.value));
-    addSubjectBtn.addEventListener('click', async () => { ... });
+    addSubjectBtn.addEventListener('click', async () => {
+      const name = prompt('Nama subjek?');
+      if (!name) return;
+      await addDoc(collection(db, 'users', uid, 'subjects'), {name, createdAt: Date.now()});
+      loadSubjects(subjectSearch.value || '');
+    });
 
-    function enterSubject(s) { ... }
+    function enterSubject(s) {
+      currentSubject = s;
+      document.getElementById('currentSubjectName').textContent = s.name;
+      showPage('topics');
+      loadTopics();
+    }
 
     // === Topics ===
     const topicSearch = document.getElementById('topicSearch');
@@ -239,26 +259,101 @@
     const topicsList = document.getElementById('topicsList');
     const backToSubjects = document.getElementById('backToSubjects');
 
-    async function loadTopics(filterText = '') { ... } // kekalkan seperti asal
+    async function loadTopics(filterText = '') {
+      topicsList.innerHTML = '';
+      const ref = doc(db, 'users', uid, 'subjects', currentSubject.id);
+      const q = query(collection(ref, 'topics'), orderBy('createdAt', 'asc'));
+      const snap = await getDocs(q);
+      snap.forEach(d => {
+        const data = d.data();
+        if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
+        const btn = document.createElement('button');
+        btn.textContent = data.name;
+        btn.className = 'px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-left';
+        btn.onclick = () => enterTopic({id: d.id, ...data});
+        topicsList.appendChild(btn);
+      });
+    }
 
     topicSearch.addEventListener('input', e => loadTopics(e.target.value));
-    addTopicBtn.addEventListener('click', async () => { ... });
+    addTopicBtn.addEventListener('click', async () => {
+      const name = prompt('Nama topik?');
+      if (!name) return;
+      const ref = doc(db, 'users', uid, 'subjects', currentSubject.id);
+      await addDoc(collection(ref, 'topics'), {name, createdAt: Date.now()});
+      loadTopics(topicSearch.value || '');
+    });
     backToSubjects.addEventListener('click', () => showPage('subjects'));
 
-    function enterTopic(t) { ... }
+    function enterTopic(t) {
+      currentTopic = t;
+      document.getElementById('currentTopicName').textContent = t.name;
+      showPage('facts');
+      loadFacts();
+    }
 
     // === Facts ===
     const factSearch = document.getElementById('factSearch');
     const factsList = document.getElementById('factsList');
     const backToTopics = document.getElementById('backToTopics');
 
-    async function loadFacts(filterText = '') { ... } // kekalkan seperti asal
+    async function loadFacts(filterText = '') {
+      factsList.innerHTML = '';
+      const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
+      const q = query(collection(ref, 'facts'), orderBy('createdAt', 'asc'));
+      const snap = await getDocs(q);
+      snap.forEach(d => {
+        const data = d.data();
+        if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
+        const btn = document.createElement('button');
+        btn.textContent = data.title;
+        btn.className = 'px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-left';
+        btn.onclick = () => enterFact({id: d.id, ...data});
+        factsList.appendChild(btn);
+      });
+    }
 
     factSearch.addEventListener('input', e => loadFacts(e.target.value));
     backToTopics.addEventListener('click', () => showPage('topics'));
 
-    // Bulk tambah fakta kekalkan seperti asal
-    // enterFact akan panggil loadPracticeRows
+    const btnTambahSemuaPantas = document.getElementById('btnTambahSemuaPantas');
+    const bulkFactsInput = document.getElementById('bulkFactsInput');
+    const bulkAddContainer = document.getElementById('bulkAddContainer');
+
+    btnTambahSemuaPantas.addEventListener('click', async () => {
+      const raw = bulkFactsInput.value.trim();
+      if (!raw) return;
+      const blocks = raw.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+      btnTambahSemuaPantas.disabled = true;
+      btnTambahSemuaPantas.textContent = `Sedang memproses ${blocks.length}...`;
+      try {
+        for (const block of blocks) {
+          const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+          if (lines.length < 2) continue;
+          await addDoc(collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts'), {
+            title: lines[0], 
+            sentence: lines.slice(1).join(" "), 
+            attempts: 0, createdAt: Date.now()
+          });
+        }
+        bulkFactsInput.value = "";
+        bulkAddContainer.classList.add('hidden');
+        loadFacts(factSearch.value || '');
+      } catch (err) { console.error(err); }
+      finally {
+        btnTambahSemuaPantas.disabled = false;
+        btnTambahSemuaPantas.textContent = "Proses Masuk Semua";
+      }
+    });
+
+    async function enterFact(f) {
+      currentFact = f;
+      document.getElementById('practiceFactTitle').textContent = f.title;
+      document.getElementById('practiceFactSentence').textContent = f.sentence;
+      document.getElementById('practiceCount').textContent = f.attempts || 0;
+      showPage('practice');
+      await loadPracticeRows();
+    }
 
     // === Practice ===
     const addPracticeRowBtn = document.getElementById('addPracticeRowBtn');
@@ -358,8 +453,7 @@
     }
 
     backToFacts.addEventListener('click', () => showPage('facts'));
+
   </script>
 </body>
 </html>
-
-
