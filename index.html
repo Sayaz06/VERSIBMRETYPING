@@ -305,11 +305,48 @@
       snap.forEach(d => {
         const data = d.data();
         if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex items-center gap-2 bg-slate-800 rounded p-2';
+
         const btn = document.createElement('button');
         btn.textContent = data.title;
-        btn.className = 'px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-left';
+        btn.className = 'flex-1 text-left';
         btn.onclick = () => enterFact({id: d.id, ...data});
-        factsList.appendChild(btn);
+        wrapper.appendChild(btn);
+
+        // ✏️ Edit tajuk
+        const editTitleBtn = document.createElement('button');
+        editTitleBtn.textContent = '✏️';
+        editTitleBtn.onclick = async () => {
+          const newTitle = prompt('Edit tajuk:', data.title);
+          if (newTitle) await updateDoc(d.ref, {title: newTitle});
+          loadFacts(filterText);
+        };
+        wrapper.appendChild(editTitleBtn);
+
+        // 📝 Edit ayat
+        const editSentenceBtn = document.createElement('button');
+        editSentenceBtn.textContent = '📝';
+        editSentenceBtn.onclick = async () => {
+          const newSentence = prompt('Edit ayat:', data.sentence);
+          if (newSentence) await updateDoc(d.ref, {sentence: newSentence});
+          loadFacts(filterText);
+        };
+        wrapper.appendChild(editSentenceBtn);
+
+        // 🗑️ Buang
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.onclick = async () => {
+          if (confirm('Padam fakta ini?')) {
+            await deleteDoc(d.ref);
+            loadFacts(filterText);
+          }
+        };
+        wrapper.appendChild(delBtn);
+
+        factsList.appendChild(wrapper);
       });
     }
 
@@ -382,36 +419,36 @@
     });
 
     submitPracticeBtn.addEventListener('click', async () => {
-      const textarea = practiceRows.querySelector('textarea');
-      if (!textarea) return;
+      const textareas = practiceRows.querySelectorAll('textarea');
+      if (!textareas.length) return;
 
-      const userAnswer = textarea.value.trim().toLowerCase();
-      const correctAnswer = currentFact.sentence.trim().toLowerCase();
+      textareas.forEach(async (textarea, index) => {
+        const userAnswer = textarea.value.trim().toLowerCase();
+        const correctAnswer = currentFact.sentence.trim().toLowerCase();
 
-      if (userAnswer === correctAnswer) {
-        textarea.classList.add('bg-green-800');
-        practiceFeedback.textContent = "Betul!";
-      } else {
-        textarea.classList.add('bg-red-800');
-        practiceFeedback.textContent = "Salah. Jawapan sebenar: " + currentFact.sentence;
-      }
-
-      // Simpan attempts
-      if (currentFact) {
-        const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts', currentFact.id);
-        await updateDoc(ref, {attempts: (currentFact.attempts || 0) + 1});
-        currentFact.attempts++;
-        document.getElementById('practiceCount').textContent = currentFact.attempts;
-
-        // Simpan jawapan penuh
-        const rowsCol = collection(ref, 'rows');
-        const q = query(rowsCol, orderBy('createdAt', 'desc'));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const lastRow = snap.docs[0];
-          await updateDoc(lastRow.ref, {answers: [{input: userAnswer, correct: userAnswer === correctAnswer}]});
+        if (userAnswer === correctAnswer) {
+          textarea.classList.add('bg-green-800');
+        } else {
+          textarea.classList.add('bg-red-800');
         }
-      }
+
+        if (currentFact) {
+          const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts', currentFact.id);
+          await updateDoc(ref, {attempts: (currentFact.attempts || 0) + 1});
+          currentFact.attempts++;
+          document.getElementById('practiceCount').textContent = currentFact.attempts;
+
+          const rowsCol = collection(ref, 'rows');
+          const q = query(rowsCol, orderBy('createdAt', 'asc'));
+          const snap = await getDocs(q);
+          const rowDoc = snap.docs[index]; // padankan ikut index
+          if (rowDoc) {
+            await updateDoc(rowDoc.ref, {
+              answers: [{input: userAnswer, correct: userAnswer === correctAnswer}]
+            });
+          }
+        }
+      });
     });
 
     async function loadPracticeRows() {
@@ -438,8 +475,9 @@
         meta.className = 'flex justify-between text-xs text-slate-400';
         meta.textContent = `Siap pada ${new Date(data.createdAt).toLocaleString()}`;
 
+        // 🗑️ Buang history
         const delBtn = document.createElement('button');
-        delBtn.textContent = '🗑️ Buang history';
+        delBtn.textContent = '🗑️';
         delBtn.className = 'ml-2';
         delBtn.onclick = async () => {
           await deleteDoc(d.ref);
@@ -453,7 +491,6 @@
     }
 
     backToFacts.addEventListener('click', () => showPage('facts'));
-
   </script>
 </body>
 </html>
