@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>First-Life</title>
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -39,7 +38,6 @@
   </header>
 
   <main id="app" class="p-4">
-    <!-- Page login -->
     <section id="page-login" class="grid place-items-center">
       <div class="max-w-md w-full bg-slate-800/50 rounded-lg p-6">
         <h2 class="text-lg font-semibold tracking-wide mb-2">Masuk akaun</h2>
@@ -50,7 +48,6 @@
       </div>
     </section>
 
-    <!-- Page subjects -->
     <section id="page-subjects" class="hidden">
       <div class="mb-4 flex items-center gap-2">
         <input id="subjectSearch" type="text" placeholder="Cari subjek..." 
@@ -64,7 +61,6 @@
       <div id="subjectsList" class="grid gap-2"></div>
     </section>
 
-    <!-- Page topics -->
     <section id="page-topics" class="hidden">
       <div class="mb-2 flex items-center justify-between">
         <button id="backToSubjects" 
@@ -85,7 +81,6 @@
       <div id="topicsList" class="grid gap-2"></div>
     </section>
 
-    <!-- Page facts -->
     <section id="page-facts" class="hidden">
       <div class="mb-2 flex items-center justify-between">
         <button id="backToTopics" 
@@ -115,7 +110,6 @@
       </div>
     </section>
 
-    <!-- Page practice -->
     <section id="page-practice" class="hidden">
       <div class="mb-2 flex items-center justify-between">
         <button id="backToFacts" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm">Kembali</button>
@@ -123,18 +117,18 @@
       </div>
       <div class="mb-3">
         <h4 class="font-semibold tracking-wide mb-1">Fakta</h4>
-        <div id="practiceFactTitle" class="text-slate-200"></div>
+        <div id="practiceFactTitle" class="text-blue-400 font-bold"></div>
       </div>
       <div class="mb-3">
         <h4 class="font-semibold tracking-wide mb-1">Ayat</h4>
-        <div id="practiceFactSentence" class="text-slate-200"></div>
+        <div id="practiceFactSentence" class="text-slate-200 italic"></div>
       </div>
       <div class="mb-3">
         <button id="addPracticeRowBtn" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 font-semibold">Tambah ulangan</button>
       </div>
       <div id="practiceRows" class="grid gap-4"></div>
       <div class="mt-4">
-        <button id="submitPracticeBtn" class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 font-semibold">Selesai</button>
+        <button id="submitPracticeBtn" class="px-4 py-2 rounded bg-green-700 hover:bg-green-600 font-semibold">Selesai</button>
       </div>
       <p id="practiceFeedback" class="mt-2 text-slate-300"></p>
     </section>
@@ -240,17 +234,17 @@
         btn.onclick = () => enterSubject({id: d.id, ...data});
         wrapper.appendChild(btn);
 
-        // ✏️ Edit subjek
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
         editBtn.onclick = async () => {
           const newName = prompt('Edit subjek:', data.name);
-          if (newName) await updateDoc(d.ref, {name: newName});
-          loadSubjects(filterText);
+          if (newName) {
+            await updateDoc(d.ref, {name: newName});
+            loadSubjects(filterText);
+          }
         };
         wrapper.appendChild(editBtn);
 
-        // 🗑️ Buang subjek
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.onclick = async () => {
@@ -260,7 +254,6 @@
           }
         };
         wrapper.appendChild(delBtn);
-
         subjectsList.appendChild(wrapper);
       });
     }
@@ -304,17 +297,17 @@
         btn.onclick = () => enterTopic({id: d.id, ...data});
         wrapper.appendChild(btn);
 
-        // ✏️ Edit topik
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
         editBtn.onclick = async () => {
           const newName = prompt('Edit topik:', data.name);
-          if (newName) await updateDoc(d.ref, {name: newName});
-          loadTopics(filterText);
+          if (newName) {
+            await updateDoc(d.ref, {name: newName});
+            loadTopics(filterText);
+          }
         };
         wrapper.appendChild(editBtn);
 
-        // 🗑️ Buang topik
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.onclick = async () => {
@@ -324,7 +317,6 @@
           }
         };
         wrapper.appendChild(delBtn);
-
         topicsList.appendChild(wrapper);
       });
     }
@@ -347,14 +339,123 @@
     }
 
     // === Facts ===
-    // (fungsi loadFacts dengan ✏️, 📝, 🗑️ sudah ditambah dalam versi sebelum ini)
+    const factSearch = document.getElementById('factSearch');
+    const btnModTambah = document.getElementById('btnModTambah');
+    const bulkAddContainer = document.getElementById('bulkAddContainer');
+    const btnTambahSemuaPantas = document.getElementById('btnTambahSemuaPantas');
+    const bulkFactsInput = document.getElementById('bulkFactsInput');
+    const factsList = document.getElementById('factsList');
+    const backToTopics = document.getElementById('backToTopics');
+
+    backToTopics.addEventListener('click', () => showPage('topics'));
+    btnModTambah.addEventListener('click', () => bulkAddContainer.classList.toggle('hidden'));
+
+    async function loadFacts(filterText = '') {
+      factsList.innerHTML = '';
+      const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
+      const q = query(collection(ref, 'facts'), orderBy('createdAt', 'asc'));
+      const snap = await getDocs(q);
+      snap.forEach(d => {
+        const data = d.data();
+        if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bg-slate-800 p-3 rounded-lg border border-slate-700 space-y-2';
+        wrapper.innerHTML = `
+          <div>
+            <div class="font-bold text-blue-400 text-lg">${data.title}</div>
+            <div class="text-sm text-slate-300">${data.sentence}</div>
+          </div>
+          <div class="flex gap-2 justify-end">
+            <button class="px-3 py-1 bg-green-700 text-xs rounded btn-latih">📝 Latih</button>
+            <button class="px-2 py-1 bg-slate-700 text-xs rounded btn-edit">✏️</button>
+            <button class="px-2 py-1 bg-red-900 text-xs rounded btn-delete">🗑️</button>
+          </div>
+        `;
+
+        wrapper.querySelector('.btn-latih').onclick = () => startPractice({id: d.id, ...data});
+        wrapper.querySelector('.btn-edit').onclick = async () => {
+          const nt = prompt('Tajuk baru:', data.title);
+          const ns = prompt('Ayat baru:', data.sentence);
+          if (nt && ns) {
+            await updateDoc(d.ref, {title: nt, sentence: ns});
+            loadFacts(filterText);
+          }
+        };
+        wrapper.querySelector('.btn-delete').onclick = async () => {
+          if (confirm('Hapus fakta?')) {
+            await deleteDoc(d.ref);
+            loadFacts(filterText);
+          }
+        };
+        factsList.appendChild(wrapper);
+      });
+    }
+
+    factSearch.addEventListener('input', e => loadFacts(e.target.value));
+
+    btnTambahSemuaPantas.addEventListener('click', async () => {
+      const text = bulkFactsInput.value.trim();
+      if (!text) return;
+      const ref = collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts');
+      const blocks = text.split(/\n\s*\n/);
+      for (const block of blocks) {
+        const lines = block.split('\n').map(l => l.trim());
+        if (lines.length >= 2) {
+          await addDoc(ref, { title: lines[0], sentence: lines[1], createdAt: Date.now() });
+        }
+      }
+      bulkFactsInput.value = '';
+      bulkAddContainer.classList.add('hidden');
+      loadFacts();
+    });
 
     // === Practice ===
-    // (fungsi createRow, addPracticeRowBtn, submitPracticeBtn, loadPracticeRows dengan 🗑️ sudah ditambah dalam versi sebelum ini)
+    const backToFacts = document.getElementById('backToFacts');
+    const practiceRows = document.getElementById('practiceRows');
+    const addPracticeRowBtn = document.getElementById('addPracticeRowBtn');
+    const submitPracticeBtn = document.getElementById('submitPracticeBtn');
+    const practiceCountSpan = document.getElementById('practiceCount');
 
     backToFacts.addEventListener('click', () => showPage('facts'));
+
+    function startPractice(f) {
+      currentFact = f;
+      document.getElementById('practiceFactTitle').textContent = f.title;
+      document.getElementById('practiceFactSentence').textContent = f.sentence;
+      document.getElementById('practiceFeedback').textContent = '';
+      practiceRows.innerHTML = '';
+      practiceCountSpan.textContent = '0';
+      showPage('practice');
+      addPracticeRow();
+    }
+
+    function addPracticeRow() {
+      const div = document.createElement('div');
+      div.className = 'flex flex-col gap-1';
+      div.innerHTML = `
+        <textarea class="w-full px-3 py-2 rounded bg-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                  rows="2" placeholder="Taip semula ayat di atas..."></textarea>
+      `;
+      practiceRows.appendChild(div);
+      practiceCountSpan.textContent = practiceRows.children.length;
+    }
+
+    addPracticeRowBtn.addEventListener('click', addPracticeRow);
+
+    submitPracticeBtn.addEventListener('click', () => {
+      const inputs = practiceRows.querySelectorAll('textarea');
+      let correct = 0;
+      inputs.forEach(input => {
+        if (input.value.trim().toLowerCase() === currentFact.sentence.trim().toLowerCase()) {
+          correct++;
+          input.classList.add('border-green-500', 'border');
+        } else {
+          input.classList.add('border-red-500', 'border');
+        }
+      });
+      document.getElementById('practiceFeedback').textContent = `Selesai! ${correct}/${inputs.length} tepat.`;
+    });
   </script>
 </body>
 </html>
-
-  
