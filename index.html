@@ -219,7 +219,8 @@
 
     async function loadSubjects(filterText = '') {
       subjectsList.innerHTML = '';
-      const q = query(collection(db, 'users', uid, 'subjects'), orderBy('createdAt', 'asc'));
+      // DISUSUN MENGIKUT NAMA (0-9, A-Z)
+      const q = query(collection(db, 'users', uid, 'subjects'), orderBy('name', 'asc'));
       const snap = await getDocs(q);
       snap.forEach(d => {
         const data = d.data();
@@ -282,7 +283,8 @@
     async function loadTopics(filterText = '') {
       topicsList.innerHTML = '';
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id);
-      const q = query(collection(ref, 'topics'), orderBy('createdAt', 'asc'));
+      // DISUSUN MENGIKUT NAMA (0-9, A-Z)
+      const q = query(collection(ref, 'topics'), orderBy('name', 'asc'));
       const snap = await getDocs(q);
       snap.forEach(d => {
         const data = d.data();
@@ -353,7 +355,8 @@
     async function loadFacts(filterText = '') {
       factsList.innerHTML = '';
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
-      const q = query(collection(ref, 'facts'), orderBy('createdAt', 'asc'));
+      // DISUSUN MENGIKUT TAJUK (0-9, A-Z)
+      const q = query(collection(ref, 'facts'), orderBy('title', 'asc'));
       const snap = await getDocs(q);
       snap.forEach(d => {
         const data = d.data();
