@@ -103,13 +103,9 @@
       <div id="factsList" class="grid gap-2 mb-4"></div>
 
       <div id="bulkAddContainer" class="hidden flex flex-col gap-2 mb-8 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-        <div class="flex gap-2 mb-2">
-          <button id="btnWizard" class="flex-1 py-2 bg-blue-900/40 hover:bg-blue-800/60 rounded text-[10px] font-bold border border-blue-700 shadow-sm transition-all uppercase">
-            🔢 CARI & SUB BIJAK
-          </button>
-        </div>
-        <textarea id="bulkFactsInput" rows="5" placeholder="Contoh:&#10;Tajuk&#10;Ayat fakta..." 
-                  class="w-full px-3 py-2 rounded bg-slate-900 text-sm focus:outline-none border border-slate-700"></textarea>
+        <p class="text-xs text-slate-400">Format: Baris 1=Tajuk, Baris 2=Ayat. Selang baris kosong untuk fakta seterusnya.</p>
+        <textarea id="bulkFactsInput" rows="5" placeholder="Contoh:&#10;Kucing&#10;Kucing ada empat kaki&#10;&#10;Ayam&#10;Ayam bertelur" 
+                  class="w-full px-3 py-2 rounded bg-slate-900 text-sm focus:outline-none"></textarea>
         <button id="btnTambahSemuaPantas" class="w-full py-2 rounded bg-blue-700 hover:bg-blue-600 font-bold text-sm">
           Proses Masuk Semua
         </button>
@@ -180,17 +176,24 @@
       navigator.serviceWorker.register('sw.js').catch(console.error);
     }
 
+    // === State ===
     let uid = null;
     let currentSubject = null;
     let currentTopic = null;
     let currentFact = null;
 
+    // === Auth ===
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const installBtn = document.getElementById('installBtn');
 
     loginBtn.addEventListener('click', async () => {
-      try { await signInWithPopup(auth, provider); } catch (e) { alert('Gagal: ' + e.message); }
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (e) {
+        console.error(e);
+        alert('Log masuk gagal: ' + e.message);
+      }
     });
     logoutBtn.addEventListener('click', async () => { await signOut(auth); });
 
@@ -208,6 +211,7 @@
       }
     });
 
+    // === Routing ===
     const pages = {
       login: document.getElementById('page-login'),
       subjects: document.getElementById('page-subjects'),
@@ -220,6 +224,7 @@
       pages[name].classList.remove('hidden');
     }
 
+    // === Helper: Copy to Clipboard ===
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text).then(() => {
         const toast = document.getElementById('toast');
@@ -229,8 +234,11 @@
     }
 
     // === Subjects ===
+    const subjectSearch = document.getElementById('subjectSearch');
+    const addSubjectBtn = document.getElementById('addSubjectBtn');
+    const subjectsList = document.getElementById('subjectsList');
+
     async function loadSubjects(filterText = '') {
-      const subjectsList = document.getElementById('subjectsList');
       subjectsList.innerHTML = '';
       const q = query(collection(db, 'users', uid, 'subjects'), orderBy('name', 'asc'));
       const snap = await getDocs(q);
@@ -239,163 +247,219 @@
         if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
         const wrapper = document.createElement('div');
         wrapper.className = 'flex items-center gap-2 bg-slate-800 rounded p-2';
-        wrapper.innerHTML = `<button class="flex-1 text-left font-medium">${data.name}</button>
-          <button class="edit-s-btn">✏️</button>
-          <button class="del-s-btn">🗑️</button>`;
-        wrapper.querySelector('button').onclick = () => enterSubject({id: d.id, ...data});
-        wrapper.querySelector('.edit-s-btn').onclick = async () => {
-          const n = prompt('Edit nama subjek:', data.name);
-          if (n) { await updateDoc(d.ref, {name: n}); loadSubjects(filterText); }
+        const btn = document.createElement('button');
+        btn.textContent = data.name;
+        btn.className = 'flex-1 text-left';
+        btn.onclick = () => enterSubject({id: d.id, ...data});
+        wrapper.appendChild(btn);
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️';
+        editBtn.onclick = async () => {
+          const newName = prompt('Edit nama subjek:', data.name);
+          if (newName) {
+            await updateDoc(d.ref, {name: newName});
+            loadSubjects(filterText);
+          }
         };
-        wrapper.querySelector('.del-s-btn').onclick = async () => {
-          if (confirm('Padam subjek ini?')) { await deleteDoc(d.ref); loadSubjects(filterText); }
+        wrapper.appendChild(editBtn);
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.onclick = async () => {
+          if (confirm('Padam subjek ini?')) {
+            await deleteDoc(d.ref);
+            loadSubjects(filterText);
+          }
         };
+        wrapper.appendChild(delBtn);
         subjectsList.appendChild(wrapper);
       });
     }
-    document.getElementById('addSubjectBtn').onclick = async () => {
-      const n = prompt('Nama subjek?');
-      if (n) { await addDoc(collection(db, 'users', uid, 'subjects'), {name: n, createdAt: Date.now()}); loadSubjects(); }
-    };
-    document.getElementById('subjectSearch').oninput = e => loadSubjects(e.target.value);
+
+    subjectSearch.addEventListener('input', e => loadSubjects(e.target.value));
+    addSubjectBtn.addEventListener('click', async () => {
+      const name = prompt('Nama subjek?');
+      if (!name) return;
+      await addDoc(collection(db, 'users', uid, 'subjects'), {name, createdAt: Date.now()});
+      loadSubjects(subjectSearch.value || '');
+    });
+
     function enterSubject(s) {
       currentSubject = s;
       document.getElementById('currentSubjectName').textContent = s.name;
-      showPage('topics'); loadTopics();
+      showPage('topics');
+      loadTopics();
     }
 
     // === Topics ===
+    const topicSearch = document.getElementById('topicSearch');
+    const addTopicBtn = document.getElementById('addTopicBtn');
+    const topicsList = document.getElementById('topicsList');
+    const backToSubjects = document.getElementById('backToSubjects');
+
     async function loadTopics(filterText = '') {
-      const topicsList = document.getElementById('topicsList');
       topicsList.innerHTML = '';
-      const q = query(collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics'), orderBy('name', 'asc'));
+      const ref = doc(db, 'users', uid, 'subjects', currentSubject.id);
+      const q = query(collection(ref, 'topics'), orderBy('name', 'asc'));
       const snap = await getDocs(q);
       snap.forEach(d => {
         const data = d.data();
         if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
         const wrapper = document.createElement('div');
         wrapper.className = 'flex items-center gap-2 bg-slate-800 rounded p-2';
-        wrapper.innerHTML = `<button class="flex-1 text-left font-medium">${data.name}</button>
-          <button class="edit-t-btn">✏️</button>
-          <button class="del-t-btn">🗑️</button>`;
-        wrapper.querySelector('button').onclick = () => enterTopic({id: d.id, ...data});
-        wrapper.querySelector('.edit-t-btn').onclick = async () => {
-          const n = prompt('Edit nama topik:', data.name);
-          if (n) { await updateDoc(d.ref, {name: n}); loadTopics(filterText); }
+        const btn = document.createElement('button');
+        btn.textContent = data.name;
+        btn.className = 'flex-1 text-left';
+        btn.onclick = () => enterTopic({id: d.id, ...data});
+        wrapper.appendChild(btn);
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️';
+        editBtn.onclick = async () => {
+          const newName = prompt('Edit nama topik:', data.name);
+          if (newName) {
+            await updateDoc(d.ref, {name: newName});
+            loadTopics(filterText);
+          }
         };
-        wrapper.querySelector('.del-t-btn').onclick = async () => {
-          if (confirm('Padam topik ini?')) { await deleteDoc(d.ref); loadTopics(filterText); }
+        wrapper.appendChild(editBtn);
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.onclick = async () => {
+          if (confirm('Padam topik ini?')) {
+            await deleteDoc(d.ref);
+            loadTopics(filterText);
+          }
         };
+        wrapper.appendChild(delBtn);
         topicsList.appendChild(wrapper);
       });
     }
-    document.getElementById('addTopicBtn').onclick = async () => {
-      const n = prompt('Nama topik?');
-      if (n) { await addDoc(collection(doc(db, 'users', uid, 'subjects', currentSubject.id), 'topics'), {name: n, createdAt: Date.now()}); loadTopics(); }
-    };
-    document.getElementById('backToSubjects').onclick = () => showPage('subjects');
+
+    topicSearch.addEventListener('input', e => loadTopics(e.target.value));
+    addTopicBtn.addEventListener('click', async () => {
+      const name = prompt('Nama topik?');
+      if (!name) return;
+      const ref = doc(db, 'users', uid, 'subjects', currentSubject.id);
+      await addDoc(collection(ref, 'topics'), {name, createdAt: Date.now()});
+      loadTopics(topicSearch.value || '');
+    });
+    backToSubjects.addEventListener('click', () => showPage('subjects'));
+
     function enterTopic(t) {
       currentTopic = t;
       document.getElementById('currentTopicName').textContent = t.name;
-      showPage('facts'); loadFacts();
+      showPage('facts');
+      loadFacts();
     }
 
-    // === Facts & WIZARD (LOGIK BARU) ===
-    const btnWizard = document.getElementById('btnWizard');
+    // === Facts ===
+    const factSearch = document.getElementById('factSearch');
+    const btnModTambah = document.getElementById('btnModTambah');
+    const bulkAddContainer = document.getElementById('bulkAddContainer');
+    const btnTambahSemuaPantas = document.getElementById('btnTambahSemuaPantas');
     const bulkFactsInput = document.getElementById('bulkFactsInput');
     const factsList = document.getElementById('factsList');
+    const backToTopics = document.getElementById('backToTopics');
 
-    btnWizard.onclick = async () => {
-      const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
-      const snap = await getDocs(query(collection(ref, 'facts'), orderBy('title', 'asc')));
-      let items = [];
-      snap.forEach(d => items.push({ title: d.data().title, trace: d.data().parentTrace || "" }));
-
-      if (items.length === 0) {
-        const start = prompt("Tiada rujukan. Masukkan tajuk utama (cth: 001.Ali):", "001.");
-        if (start) bulkFactsInput.value += `${start}\n(Isi ayat)\n\n`;
-        return;
-      }
-
-      const searchKey = prompt(`Cari rujukan (cth: Ali):`);
-      if (!searchKey) return;
-      const found = items.filter(it => it.title.toLowerCase().includes(searchKey.toLowerCase()));
-      let selected;
-      if (found.length === 0) { alert("Tiada!"); return; }
-      else if (found.length === 1) { selected = found[0]; }
-      else {
-        const pick = prompt(`Pilih nombor:\n${found.map((f, i) => `${i+1}. ${f.title}`).join('\n')}`);
-        if (!pick) return;
-        selected = found[parseInt(pick)-1];
-      }
-
-      const newLabel = prompt(`Masukkan nama SUB bagi [${selected.title}]:`);
-      if (!newLabel) return;
-
-      const currentFullTrace = selected.trace ? `${selected.trace} » ${selected.title}` : selected.title;
-      const finalTitle = `${selected.title.split('.')[0]}.${items.length + 1}.${newLabel}`;
-      bulkFactsInput.value += `${finalTitle}\n(Isi ayat)\n[TRACE:${currentFullTrace}]\n\n`;
-      bulkFactsInput.focus();
-    };
+    backToTopics.addEventListener('click', () => showPage('topics'));
+    
+    btnModTambah.addEventListener('click', () => {
+        bulkAddContainer.classList.toggle('hidden');
+        if(!bulkAddContainer.classList.contains('hidden')) {
+            bulkAddContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+    });
 
     async function loadFacts(filterText = '') {
       factsList.innerHTML = '';
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
       const q = query(collection(ref, 'facts'), orderBy('title', 'asc'));
       const snap = await getDocs(q);
-      
       snap.forEach(d => {
         const data = d.data();
         if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
-
-        let traceHtml = "";
-        if (data.parentTrace) {
-           const hierarchy = data.parentTrace.split(' » '); 
-           const colors = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-orange-400', 'text-red-400', 'text-pink-400'];
-           const coloredPath = hierarchy.map((name, i) => `<span class="${colors[i] || 'text-purple-400'} font-bold">${name}</span>`).join(' <span class="text-slate-600 mx-1">»</span> ');
-           traceHtml = `<div class="bg-slate-950/80 px-3 py-1.5 rounded border border-slate-700 text-[11px] mb-2 w-fit"><span class="text-slate-500 italic mr-1">Sub bagi:</span> ${coloredPath}</div>`;
-        }
-
         const wrapper = document.createElement('div');
-        wrapper.className = 'flex flex-col gap-2 bg-slate-800 rounded p-3 border border-slate-700 mb-2';
-        wrapper.innerHTML = `
-          ${traceHtml}
-          <div class="flex justify-between items-start gap-2">
-            <div class="flex-1">
-              <div class="font-bold text-blue-400">${data.title}</div>
-              <div class="text-sm text-slate-300 italic mt-1">${data.sentence}</div>
-            </div>
-            <div class="flex flex-col gap-2">
-              <button class="cp-t p-2 bg-slate-700 rounded text-xs">📋</button>
-              <button class="cp-s p-2 bg-slate-700 rounded text-xs">📝</button>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 justify-end mt-2 pt-2 border-t border-slate-700/50">
-            <button class="prac-btn text-xs bg-slate-700 px-2 py-1 rounded">📝 Latih</button>
-            <button class="edit-t text-xs bg-slate-700 px-2 py-1 rounded">✏️ Tajuk</button>
-            <button class="edit-s text-xs bg-slate-700 px-2 py-1 rounded">✏️ Ayat</button>
-            <button class="del-btn text-xs bg-red-900/50 px-2 py-1 rounded">🗑️</button>
-          </div>
-        `;
-        wrapper.querySelector('.cp-t').onclick = () => copyToClipboard(data.title);
-        wrapper.querySelector('.cp-s').onclick = () => copyToClipboard(data.sentence);
-        wrapper.querySelector('.prac-btn').onclick = () => startPractice({id: d.id, ...data});
-        wrapper.querySelector('.edit-t').onclick = async () => {
-          const nt = prompt('Edit tajuk:', data.title);
-          if (nt) { await updateDoc(d.ref, {title: nt}); loadFacts(filterText); }
+        wrapper.className = 'flex flex-col gap-2 bg-slate-800 rounded p-3 border border-slate-700';
+        
+        const contentHeader = document.createElement('div');
+        contentHeader.className = 'flex justify-between items-start gap-2';
+        
+        const textSection = document.createElement('div');
+        textSection.className = 'flex-1';
+        textSection.innerHTML = `<div class="font-bold text-blue-400">${data.title}</div><div class="text-sm text-slate-300 italic mt-1">${data.sentence}</div>`;
+        
+        // COPY BUTTONS SECTION
+        const copySection = document.createElement('div');
+        copySection.className = 'flex flex-col gap-2';
+        
+        const copyTitleBtn = document.createElement('button');
+        copyTitleBtn.innerHTML = '📋'; // Copy Tajuk
+        copyTitleBtn.title = "Salin Tajuk";
+        copyTitleBtn.className = "p-2 bg-slate-700 hover:bg-slate-600 rounded text-xs";
+        copyTitleBtn.onclick = () => copyToClipboard(data.title);
+
+        const copySentenceBtn = document.createElement('button');
+        copySentenceBtn.innerHTML = '📝'; // Copy Ayat
+        copySentenceBtn.title = "Salin Ayat";
+        copySentenceBtn.className = "p-2 bg-slate-700 hover:bg-slate-600 rounded text-xs";
+        copySentenceBtn.onclick = () => copyToClipboard(data.sentence);
+        
+        copySection.appendChild(copyTitleBtn);
+        copySection.appendChild(copySentenceBtn);
+        
+        contentHeader.appendChild(textSection);
+        contentHeader.appendChild(copySection);
+        wrapper.appendChild(contentHeader);
+
+        const actions = document.createElement('div');
+        actions.className = 'flex items-center gap-3 justify-end mt-2 pt-2 border-t border-slate-700/50';
+        const practiceBtn = document.createElement('button');
+        practiceBtn.textContent = '📝 Latih';
+        practiceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
+        practiceBtn.onclick = () => startPractice({id: d.id, ...data});
+        actions.appendChild(practiceBtn);
+        
+        const editTitleBtn = document.createElement('button');
+        editTitleBtn.textContent = '✏️ Tajuk';
+        editTitleBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
+        editTitleBtn.onclick = async () => {
+          const nt = prompt('Edit tajuk fakta sahaja:', data.title);
+          if (nt) {
+            await updateDoc(d.ref, {title: nt});
+            loadFacts(filterText);
+          }
         };
-        wrapper.querySelector('.edit-s').onclick = async () => {
-          const ns = prompt('Edit ayat:', data.sentence);
-          if (ns) { await updateDoc(d.ref, {sentence: ns}); loadFacts(filterText); }
+        actions.appendChild(editTitleBtn);
+        
+        const editSentenceBtn = document.createElement('button');
+        editSentenceBtn.textContent = '✏️ Ayat';
+        editSentenceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
+        editSentenceBtn.onclick = async () => {
+          const ns = prompt('Edit ayat fakta sahaja:', data.sentence);
+          if (ns) {
+            await updateDoc(d.ref, {sentence: ns});
+            loadFacts(filterText);
+          }
         };
-        wrapper.querySelector('.del-btn').onclick = async () => {
-          if (confirm('Padam?')) { await deleteDoc(d.ref); loadFacts(filterText); }
+        actions.appendChild(editSentenceBtn);
+        
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.className = 'text-xs bg-red-900/50 px-2 py-1 rounded hover:bg-red-800';
+        delBtn.onclick = async () => {
+          if (confirm('Padam fakta ini secara kekal?')) {
+            await deleteDoc(d.ref);
+            loadFacts(filterText);
+          }
         };
+        actions.appendChild(delBtn);
+        wrapper.appendChild(actions);
         factsList.appendChild(wrapper);
       });
     }
 
-    document.getElementById('btnTambahSemuaPantas').onclick = async () => {
+    factSearch.addEventListener('input', e => loadFacts(e.target.value));
+
+    btnTambahSemuaPantas.addEventListener('click', async () => {
       const text = bulkFactsInput.value.trim();
       if (!text) return;
       const ref = collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts');
@@ -403,43 +467,58 @@
       for (const block of blocks) {
         const lines = block.split('\n').map(l => l.trim()).filter(l => l !== "");
         if (lines.length >= 2) {
-          let parentTrace = "";
-          const traceIdx = lines.findIndex(l => l.startsWith('[TRACE:'));
-          if (traceIdx !== -1) {
-            parentTrace = lines[traceIdx].replace('[TRACE:', '').replace(']', '');
-            lines.splice(traceIdx, 1);
-          }
-          await addDoc(ref, { title: lines[0], sentence: lines[1], parentTrace, createdAt: Date.now() });
+          await addDoc(ref, { title: lines[0], sentence: lines[1], createdAt: Date.now() });
+        } else if (lines.length === 1) {
+          await addDoc(ref, { title: "ERROR", sentence: lines[0], createdAt: Date.now() });
         }
       }
-      bulkFactsInput.value = ''; document.getElementById('bulkAddContainer').classList.add('hidden'); loadFacts();
-    };
-    document.getElementById('btnModTambah').onclick = () => document.getElementById('bulkAddContainer').classList.toggle('hidden');
-    document.getElementById('backToTopics').onclick = () => showPage('topics');
-    document.getElementById('factSearch').oninput = e => loadFacts(e.target.value);
+      bulkFactsInput.value = '';
+      bulkAddContainer.classList.add('hidden');
+      loadFacts();
+    });
 
-    // === PRACTICE (LEVENSHTEIN KEKAL) ===
+    // === Practice ===
+    const backToFacts = document.getElementById('backToFacts');
+    const practiceRows = document.getElementById('practiceRows');
+    const addPracticeRowBtn = document.getElementById('addPracticeRowBtn');
+    const submitPracticeBtn = document.getElementById('submitPracticeBtn');
+
+    backToFacts.addEventListener('click', () => showPage('facts'));
+
     function startPractice(f) {
       currentFact = f;
       document.getElementById('practiceFactTitle').textContent = f.title;
       document.getElementById('practiceFactSentence').textContent = f.sentence;
       document.getElementById('practiceFeedback').textContent = '';
       practiceRows.innerHTML = '';
-      showPage('practice'); addPracticeRow();
+      document.getElementById('practiceCount').textContent = '0';
+      showPage('practice');
+      addPracticeRow();
     }
+
     function addPracticeRow() {
       const div = document.createElement('div');
-      div.className = 'flex flex-col gap-1';
-      div.innerHTML = `<div class="flex items-center gap-2">
-            <textarea class="flex-1 px-3 py-2 rounded bg-slate-800 text-sm focus:ring-1 focus:ring-slate-600 outline-none border border-transparent" rows="2" placeholder="Taip semula..."></textarea>
-            <button class="btn-del-row text-lg p-2 hover:bg-slate-700 rounded">🗑️</button>
-        </div>`;
-      div.querySelector('.btn-del-row').onclick = () => { div.remove(); updatePracticeCount(); };
-      practiceRows.appendChild(div); updatePracticeCount();
+      div.className = 'flex flex-col gap-1 transition-opacity duration-700';
+      div.innerHTML = `
+        <div class="flex items-center gap-2">
+            <textarea class="flex-1 px-3 py-2 rounded bg-slate-800 text-sm focus:ring-1 focus:ring-slate-600 outline-none border border-transparent focus:border-slate-500 transition-all duration-700" rows="2" placeholder="Taip semula di sini..."></textarea>
+            <button class="btn-del-row text-lg p-2 hover:bg-slate-700 rounded transition-colors">🗑️</button>
+        </div>
+      `;
+      div.querySelector('.btn-del-row').onclick = () => {
+        div.remove();
+        updatePracticeCount();
+      };
+      practiceRows.appendChild(div);
+      updatePracticeCount();
+      div.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    document.getElementById('addPracticeRowBtn').onclick = addPracticeRow;
-    function updatePracticeCount() { document.getElementById('practiceCount').textContent = practiceRows.children.length; }
-    document.getElementById('backToFacts').onclick = () => showPage('facts');
+
+    addPracticeRowBtn.addEventListener('click', addPracticeRow);
+
+    function updatePracticeCount() {
+      document.getElementById('practiceCount').textContent = practiceRows.children.length;
+    }
 
     function getLevenshtein(a, b) {
       const tmp = [];
@@ -447,46 +526,65 @@
       for (let j = 0; j <= b.length; j++) tmp[0][j] = j;
       for (let i = 1; i <= a.length; i++) {
         for (let j = 1; j <= b.length; j++) {
-          tmp[i][j] = Math.min(tmp[i-1][j]+1, tmp[i][j-1]+1, tmp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+          tmp[i][j] = Math.min(
+            tmp[i - 1][j] + 1,
+            tmp[i][j - 1] + 1,
+            tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+          );
         }
       }
       return tmp[a.length][b.length];
     }
 
-    document.getElementById('submitPracticeBtn').onclick = () => {
+    submitPracticeBtn.addEventListener('click', () => {
       const rows = practiceRows.querySelectorAll('div.flex-col');
       const targetSentence = currentFact.sentence.trim();
       const targetWords = targetSentence.split(/\s+/);
+      
       rows.forEach(row => {
         const input = row.querySelector('textarea');
-        let feedbackArea = row.querySelector('.ejaan-feedback') || document.createElement('div');
-        feedbackArea.className = "ejaan-feedback text-[11px] mt-1 leading-relaxed px-1";
-        if (!row.querySelector('.ejaan-feedback')) row.appendChild(feedbackArea);
+        let feedbackArea = row.querySelector('.ejaan-feedback');
+        if (!feedbackArea) {
+          feedbackArea = document.createElement('div');
+          feedbackArea.className = "ejaan-feedback text-[11px] mt-1 leading-relaxed px-1";
+          row.appendChild(feedbackArea);
+        }
 
         const userSentence = input.value.trim();
         const userWords = userSentence.split(/\s+/);
 
         if (userSentence.toLowerCase() === targetSentence.toLowerCase()) {
-          input.className = "flex-1 px-3 py-2 rounded bg-slate-800/40 text-slate-600 text-sm transition-all";
+          input.className = "flex-1 px-3 py-2 rounded bg-slate-800/40 border-slate-800 text-slate-600 text-sm transition-all duration-700";
           row.style.opacity = "0.4";
-          feedbackArea.innerHTML = "<span class='text-green-500 font-bold'>✓ Tepat</span>";
-        } else {
+          feedbackArea.innerHTML = "<span class='text-green-500 font-bold'>✓ Tepat Sebutan & Ejaan</span>";
+        } 
+        else {
           let htmlResult = "";
           targetWords.forEach((tWord, index) => {
             const uWord = userWords[index] || "";
-            const dist = getLevenshtein(tWord.toLowerCase().replace(/[.,!?;]/g, ""), uWord.toLowerCase().replace(/[.,!?;]/g, ""));
-            const tolerance = Math.max(1, Math.floor(tWord.length / 3));
-            if (uWord === "") htmlResult += `<span class="text-slate-500 line-through opacity-50">${tWord}</span> `;
-            else if (dist === 0) htmlResult += `<span class="text-slate-400">${uWord}</span> `;
-            else if (dist <= tolerance) htmlResult += `<span class="text-orange-400 font-bold underline">${uWord}</span> `;
-            else htmlResult += `<span class="text-red-500 font-bold underline">${uWord}</span> `;
+            const cleanTWord = tWord.toLowerCase().replace(/[.,!?;]/g, "");
+            const cleanUWord = uWord.toLowerCase().replace(/[.,!?;]/g, "");
+            const dist = getLevenshtein(cleanTWord, cleanUWord);
+            const tolerance = Math.max(1, Math.floor(cleanTWord.length / 3));
+
+            if (uWord === "") {
+              htmlResult += `<span class="text-slate-500 line-through decoration-red-500 opacity-50">${tWord}</span> `;
+            } else if (dist === 0) {
+              htmlResult += `<span class="text-slate-400">${uWord}</span> `;
+            } else if (dist <= tolerance) {
+              htmlResult += `<span class="text-orange-400 font-bold underline decoration-orange-500">${uWord}</span> `;
+            } else {
+              htmlResult += `<span class="text-red-500 font-bold underline decoration-red-700">${uWord}</span> `;
+            }
           });
-          input.className = "flex-1 px-3 py-2 rounded bg-red-900/10 border-red-500/30 text-white text-sm";
-          feedbackArea.innerHTML = htmlResult;
+
+          input.className = "flex-1 px-3 py-2 rounded bg-red-900/10 border-red-500/30 text-white text-sm transition-all duration-700";
+          row.style.opacity = "1";
+          feedbackArea.innerHTML = `<span class="text-slate-500 text-[9px] uppercase tracking-tighter">Analisis:</span> ${htmlResult}`;
         }
       });
-      document.getElementById('practiceFeedback').textContent = `Selesai menyemak.`;
-    };
+      document.getElementById('practiceFeedback').textContent = `Selesai menyemak. Perbaiki bahagian berwarna.`;
+    });
   </script>
 </body>
 </html>
