@@ -125,7 +125,7 @@
         <div id="practiceFactSentence" class="text-slate-300 italic"></div>
       </div>
 
-      <div id="practiceRows" class="grid gap-4 mb-20"></div>
+      <div id="practiceRows" class="grid gap-4 mb-20 transition-all duration-500"></div>
 
       <div class="mt-4 pb-10">
         <button id="submitPracticeBtn" class="w-full py-3 rounded bg-blue-700 hover:bg-blue-600 font-bold shadow-xl border border-blue-500">
@@ -232,16 +232,13 @@
       snap.forEach(d => {
         const data = d.data();
         if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
-
         const wrapper = document.createElement('div');
         wrapper.className = 'flex items-center gap-2 bg-slate-800 rounded p-2';
-
         const btn = document.createElement('button');
         btn.textContent = data.name;
         btn.className = 'flex-1 text-left';
         btn.onclick = () => enterSubject({id: d.id, ...data});
         wrapper.appendChild(btn);
-
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
         editBtn.onclick = async () => {
@@ -252,7 +249,6 @@
           }
         };
         wrapper.appendChild(editBtn);
-
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.onclick = async () => {
@@ -295,16 +291,13 @@
       snap.forEach(d => {
         const data = d.data();
         if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
-
         const wrapper = document.createElement('div');
         wrapper.className = 'flex items-center gap-2 bg-slate-800 rounded p-2';
-
         const btn = document.createElement('button');
         btn.textContent = data.name;
         btn.className = 'flex-1 text-left';
         btn.onclick = () => enterTopic({id: d.id, ...data});
         wrapper.appendChild(btn);
-
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
         editBtn.onclick = async () => {
@@ -315,7 +308,6 @@
           }
         };
         wrapper.appendChild(editBtn);
-
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.onclick = async () => {
@@ -372,24 +364,19 @@
       snap.forEach(d => {
         const data = d.data();
         if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
-
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col gap-2 bg-slate-800 rounded p-3 border border-slate-700';
-
         const content = document.createElement('div');
         content.className = 'flex-1';
         content.innerHTML = `<div class="font-bold text-blue-400">${data.title}</div><div class="text-sm text-slate-300 italic mt-1">${data.sentence}</div>`;
         wrapper.appendChild(content);
-
         const actions = document.createElement('div');
         actions.className = 'flex items-center gap-3 justify-end mt-2 pt-2 border-t border-slate-700/50';
-
         const practiceBtn = document.createElement('button');
         practiceBtn.textContent = '📝 Latih';
         practiceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
         practiceBtn.onclick = () => startPractice({id: d.id, ...data});
         actions.appendChild(practiceBtn);
-
         const editTitleBtn = document.createElement('button');
         editTitleBtn.textContent = '✏️ Tajuk';
         editTitleBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
@@ -401,7 +388,6 @@
           }
         };
         actions.appendChild(editTitleBtn);
-
         const editSentenceBtn = document.createElement('button');
         editSentenceBtn.textContent = '✏️ Ayat';
         editSentenceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
@@ -413,7 +399,6 @@
           }
         };
         actions.appendChild(editSentenceBtn);
-
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.className = 'text-xs bg-red-900/50 px-2 py-1 rounded hover:bg-red-800';
@@ -424,7 +409,6 @@
           }
         };
         actions.appendChild(delBtn);
-
         wrapper.appendChild(actions);
         factsList.appendChild(wrapper);
       });
@@ -469,9 +453,9 @@
 
     function addPracticeRow() {
       const div = document.createElement('div');
-      div.className = 'flex items-center gap-2';
+      div.className = 'flex items-center gap-2 transition-opacity duration-700';
       div.innerHTML = `
-        <textarea class="flex-1 px-3 py-2 rounded bg-slate-800 text-sm focus:ring-1 focus:ring-slate-600 outline-none border border-transparent focus:border-slate-500 transition-all" rows="2" placeholder="Taip semula di sini..."></textarea>
+        <textarea class="flex-1 px-3 py-2 rounded bg-slate-800 text-sm focus:ring-1 focus:ring-slate-600 outline-none border border-transparent focus:border-slate-500 transition-all duration-700" rows="2" placeholder="Taip semula di sini..."></textarea>
         <button class="btn-del-row text-lg p-2 hover:bg-slate-700 rounded transition-colors">🗑️</button>
       `;
       div.querySelector('.btn-del-row').onclick = () => {
@@ -480,8 +464,6 @@
       };
       practiceRows.appendChild(div);
       updatePracticeCount();
-      
-      // Auto skrol ke baris baru
       div.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
@@ -491,20 +473,52 @@
       document.getElementById('practiceCount').textContent = practiceRows.children.length;
     }
 
+    // --- Fungsi Bantuan: Kira Jarak Ejaan ---
+    function getLevenshtein(a, b) {
+      const tmp = [];
+      for (let i = 0; i <= a.length; i++) tmp[i] = [i];
+      for (let j = 0; j <= b.length; j++) tmp[0][j] = j;
+      for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+          tmp[i][j] = Math.min(
+            tmp[i - 1][j] + 1,
+            tmp[i][j - 1] + 1,
+            tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+          );
+        }
+      }
+      return tmp[a.length][b.length];
+    }
+
     submitPracticeBtn.addEventListener('click', () => {
-      const inputs = practiceRows.querySelectorAll('textarea');
-      let correct = 0;
-      inputs.forEach(input => {
-        if (input.value.trim().toLowerCase() === currentFact.sentence.trim().toLowerCase()) {
-          correct++;
-          input.classList.remove('bg-slate-800', 'border-transparent', 'bg-red-900/30', 'border-red-500');
-          input.classList.add('bg-green-900/30', 'border-green-500');
-        } else {
-          input.classList.remove('bg-slate-800', 'border-transparent', 'bg-green-900/30', 'border-green-500');
-          input.classList.add('bg-red-900/30', 'border-red-500');
+      const rows = practiceRows.querySelectorAll('div');
+      const targetAyat = currentFact.sentence.trim().toLowerCase();
+      let tepat = 0;
+      let typo = 0;
+      
+      rows.forEach(row => {
+        const input = row.querySelector('textarea');
+        const jawapanUser = input.value.trim().toLowerCase();
+        
+        const jarak = getLevenshtein(targetAyat, jawapanUser);
+        const limitTypo = Math.max(1, Math.floor(targetAyat.length / 15));
+
+        if (jarak === 0) {
+          tepat++;
+          input.className = "flex-1 px-3 py-2 rounded bg-slate-800/40 border-slate-800 text-slate-600 text-sm transition-all duration-700";
+          row.style.opacity = "0.4";
+        } 
+        else if (jarak <= limitTypo) {
+          typo++;
+          input.className = "flex-1 px-3 py-2 rounded bg-orange-900/20 border-orange-800/30 text-orange-200/50 text-sm transition-all duration-700";
+          row.style.opacity = "0.6";
+        } 
+        else {
+          input.className = "flex-1 px-3 py-2 rounded bg-red-900/30 border-red-500 text-white text-sm transition-all duration-700";
+          row.style.opacity = "1";
         }
       });
-      document.getElementById('practiceFeedback').textContent = `Hasil: ${correct}/${inputs.length} tepat!`;
+      document.getElementById('practiceFeedback').textContent = `Hasil: ${tepat} Tepat | ${typo} Typo | ${rows.length - (tepat+typo)} Salah`;
     });
   </script>
 </body>
