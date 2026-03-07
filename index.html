@@ -102,13 +102,7 @@
 
       <div id="factsList" class="grid gap-2 mb-4"></div>
 
-      <div class="mb-4">
-        <button id="btnModTambahBawah" class="w-full py-4 rounded bg-slate-700 hover:bg-slate-600 font-bold border border-slate-600 shadow-lg">
-          + Tambah Fakta Baru
-        </button>
-      </div>
-
-      <div id="bulkAddContainer" class="hidden flex flex-col gap-2 mb-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+      <div id="bulkAddContainer" class="hidden flex flex-col gap-2 mb-8 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
         <p class="text-xs text-slate-400">Format: Baris 1=Tajuk, Baris 2=Ayat. Selang baris kosong untuk fakta seterusnya.</p>
         <textarea id="bulkFactsInput" rows="5" placeholder="Contoh:&#10;Kucing&#10;Kucing ada empat kaki&#10;&#10;Ayam&#10;Ayam bertelur" 
                   class="w-full px-3 py-2 rounded bg-slate-900 text-sm focus:outline-none"></textarea>
@@ -349,7 +343,6 @@
     // === Facts ===
     const factSearch = document.getElementById('factSearch');
     const btnModTambah = document.getElementById('btnModTambah');
-    const btnModTambahBawah = document.getElementById('btnModTambahBawah');
     const bulkAddContainer = document.getElementById('bulkAddContainer');
     const btnTambahSemuaPantas = document.getElementById('btnTambahSemuaPantas');
     const bulkFactsInput = document.getElementById('bulkFactsInput');
@@ -358,13 +351,13 @@
 
     backToTopics.addEventListener('click', () => showPage('topics'));
     
-    const toggleBulkAdd = () => {
+    // Fungsi ini kekalkan scrollIntoView
+    btnModTambah.addEventListener('click', () => {
         bulkAddContainer.classList.toggle('hidden');
-        if(!bulkAddContainer.classList.contains('hidden')) bulkAddContainer.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    btnModTambah.addEventListener('click', toggleBulkAdd);
-    btnModTambahBawah.addEventListener('click', toggleBulkAdd);
+        if(!bulkAddContainer.classList.contains('hidden')) {
+            bulkAddContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+    });
 
     async function loadFacts(filterText = '') {
       factsList.innerHTML = '';
