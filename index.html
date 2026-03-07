@@ -142,6 +142,10 @@
     </section>
   </main>
 
+  <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold opacity-0 transition-opacity pointer-events-none z-50">
+    Disalin!
+  </div>
+
   <footer class="px-4 py-6 text-center text-sm text-slate-400">Very good job!</footer>
 
   <script type="module">
@@ -218,6 +222,15 @@
     function showPage(name) {
       Object.values(pages).forEach(el => el.classList.add('hidden'));
       pages[name].classList.remove('hidden');
+    }
+
+    // === Helper: Copy to Clipboard ===
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        toast.style.opacity = '1';
+        setTimeout(() => toast.style.opacity = '0', 1500);
+      });
     }
 
     // === Subjects ===
@@ -366,10 +379,37 @@
         if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col gap-2 bg-slate-800 rounded p-3 border border-slate-700';
-        const content = document.createElement('div');
-        content.className = 'flex-1';
-        content.innerHTML = `<div class="font-bold text-blue-400">${data.title}</div><div class="text-sm text-slate-300 italic mt-1">${data.sentence}</div>`;
-        wrapper.appendChild(content);
+        
+        const contentHeader = document.createElement('div');
+        contentHeader.className = 'flex justify-between items-start gap-2';
+        
+        const textSection = document.createElement('div');
+        textSection.className = 'flex-1';
+        textSection.innerHTML = `<div class="font-bold text-blue-400">${data.title}</div><div class="text-sm text-slate-300 italic mt-1">${data.sentence}</div>`;
+        
+        // COPY BUTTONS SECTION
+        const copySection = document.createElement('div');
+        copySection.className = 'flex flex-col gap-2';
+        
+        const copyTitleBtn = document.createElement('button');
+        copyTitleBtn.innerHTML = '📋'; // Copy Tajuk
+        copyTitleBtn.title = "Salin Tajuk";
+        copyTitleBtn.className = "p-2 bg-slate-700 hover:bg-slate-600 rounded text-xs";
+        copyTitleBtn.onclick = () => copyToClipboard(data.title);
+
+        const copySentenceBtn = document.createElement('button');
+        copySentenceBtn.innerHTML = '📝'; // Copy Ayat
+        copySentenceBtn.title = "Salin Ayat";
+        copySentenceBtn.className = "p-2 bg-slate-700 hover:bg-slate-600 rounded text-xs";
+        copySentenceBtn.onclick = () => copyToClipboard(data.sentence);
+        
+        copySection.appendChild(copyTitleBtn);
+        copySection.appendChild(copySentenceBtn);
+        
+        contentHeader.appendChild(textSection);
+        contentHeader.appendChild(copySection);
+        wrapper.appendChild(contentHeader);
+
         const actions = document.createElement('div');
         actions.className = 'flex items-center gap-3 justify-end mt-2 pt-2 border-t border-slate-700/50';
         const practiceBtn = document.createElement('button');
@@ -377,6 +417,7 @@
         practiceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
         practiceBtn.onclick = () => startPractice({id: d.id, ...data});
         actions.appendChild(practiceBtn);
+        
         const editTitleBtn = document.createElement('button');
         editTitleBtn.textContent = '✏️ Tajuk';
         editTitleBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
@@ -388,6 +429,7 @@
           }
         };
         actions.appendChild(editTitleBtn);
+        
         const editSentenceBtn = document.createElement('button');
         editSentenceBtn.textContent = '✏️ Ayat';
         editSentenceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
@@ -399,6 +441,7 @@
           }
         };
         actions.appendChild(editSentenceBtn);
+        
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.className = 'text-xs bg-red-900/50 px-2 py-1 rounded hover:bg-red-800';
@@ -416,23 +459,16 @@
 
     factSearch.addEventListener('input', e => loadFacts(e.target.value));
 
-    // --- LOGIK DIKEMASKINI: TAMBAH FAKTA ---
     btnTambahSemuaPantas.addEventListener('click', async () => {
       const text = bulkFactsInput.value.trim();
       if (!text) return;
       const ref = collection(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id, 'facts');
-      
-      // Pecahkan blok guna selang baris kosong
       const blocks = text.split(/\n\s*\n/);
-      
       for (const block of blocks) {
         const lines = block.split('\n').map(l => l.trim()).filter(l => l !== "");
-        
         if (lines.length >= 2) {
-          // Normal: Baris 1=Tajuk, Baris 2=Ayat
           await addDoc(ref, { title: lines[0], sentence: lines[1], createdAt: Date.now() });
         } else if (lines.length === 1) {
-          // PERMINTAAN: Jika ada 1 baris sahaja, set tajuk ke "ERROR"
           await addDoc(ref, { title: "ERROR", sentence: lines[0], createdAt: Date.now() });
         }
       }
@@ -484,7 +520,6 @@
       document.getElementById('practiceCount').textContent = practiceRows.children.length;
     }
 
-    // --- Fungsi Bantuan: Kira Jarak Ejaan (Levenshtein) ---
     function getLevenshtein(a, b) {
       const tmp = [];
       for (let i = 0; i <= a.length; i++) tmp[i] = [i];
@@ -505,7 +540,6 @@
       const rows = practiceRows.querySelectorAll('div.flex-col');
       const targetSentence = currentFact.sentence.trim();
       const targetWords = targetSentence.split(/\s+/);
-      let totalTepat = 0;
       
       rows.forEach(row => {
         const input = row.querySelector('textarea');
@@ -520,7 +554,6 @@
         const userWords = userSentence.split(/\s+/);
 
         if (userSentence.toLowerCase() === targetSentence.toLowerCase()) {
-          totalTepat++;
           input.className = "flex-1 px-3 py-2 rounded bg-slate-800/40 border-slate-800 text-slate-600 text-sm transition-all duration-700";
           row.style.opacity = "0.4";
           feedbackArea.innerHTML = "<span class='text-green-500 font-bold'>✓ Tepat Sebutan & Ejaan</span>";
@@ -550,7 +583,7 @@
           feedbackArea.innerHTML = `<span class="text-slate-500 text-[9px] uppercase tracking-tighter">Analisis:</span> ${htmlResult}`;
         }
       });
-      document.getElementById('practiceFeedback').textContent = `Selesai menyemak ${rows.length} ulangan. Perbaiki bahagian berwarna.`;
+      document.getElementById('practiceFeedback').textContent = `Selesai menyemak. Perbaiki bahagian berwarna.`;
     });
   </script>
 </body>
