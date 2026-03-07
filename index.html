@@ -100,6 +100,12 @@
 
       <div id="factsList" class="grid gap-2 mb-4"></div>
 
+      <div class="mb-4">
+        <button id="btnModTambahBawah" class="w-full py-3 rounded bg-slate-700 hover:bg-slate-600 font-bold border border-slate-600">
+          + Tambah Fakta
+        </button>
+      </div>
+
       <div id="bulkAddContainer" class="hidden flex flex-col gap-2 mb-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
         <p class="text-xs text-slate-400">Format: Baris 1=Tajuk, Baris 2=Ayat. Selang baris kosong untuk fakta seterusnya.</p>
         <textarea id="bulkFactsInput" rows="5" placeholder="Contoh:&#10;Kucing&#10;Kucing ada empat kaki&#10;&#10;Ayam&#10;Ayam bertelur" 
@@ -219,7 +225,6 @@
 
     async function loadSubjects(filterText = '') {
       subjectsList.innerHTML = '';
-      // DISUSUN MENGIKUT NAMA (0-9, A-Z)
       const q = query(collection(db, 'users', uid, 'subjects'), orderBy('name', 'asc'));
       const snap = await getDocs(q);
       snap.forEach(d => {
@@ -283,7 +288,6 @@
     async function loadTopics(filterText = '') {
       topicsList.innerHTML = '';
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id);
-      // DISUSUN MENGIKUT NAMA (0-9, A-Z)
       const q = query(collection(ref, 'topics'), orderBy('name', 'asc'));
       const snap = await getDocs(q);
       snap.forEach(d => {
@@ -343,6 +347,7 @@
     // === Facts ===
     const factSearch = document.getElementById('factSearch');
     const btnModTambah = document.getElementById('btnModTambah');
+    const btnModTambahBawah = document.getElementById('btnModTambahBawah');
     const bulkAddContainer = document.getElementById('bulkAddContainer');
     const btnTambahSemuaPantas = document.getElementById('btnTambahSemuaPantas');
     const bulkFactsInput = document.getElementById('bulkFactsInput');
@@ -350,12 +355,18 @@
     const backToTopics = document.getElementById('backToTopics');
 
     backToTopics.addEventListener('click', () => showPage('topics'));
-    btnModTambah.addEventListener('click', () => bulkAddContainer.classList.toggle('hidden'));
+    
+    const toggleBulkAdd = () => {
+        bulkAddContainer.classList.toggle('hidden');
+        if(!bulkAddContainer.classList.contains('hidden')) bulkAddContainer.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    btnModTambah.addEventListener('click', toggleBulkAdd);
+    btnModTambahBawah.addEventListener('click', toggleBulkAdd);
 
     async function loadFacts(filterText = '') {
       factsList.innerHTML = '';
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
-      // DISUSUN MENGIKUT TAJUK (0-9, A-Z)
       const q = query(collection(ref, 'facts'), orderBy('title', 'asc'));
       const snap = await getDocs(q);
       snap.forEach(d => {
@@ -373,14 +384,12 @@
         const actions = document.createElement('div');
         actions.className = 'flex items-center gap-3 justify-end mt-2 pt-2 border-t border-slate-700/50';
 
-        // Butang Latih
         const practiceBtn = document.createElement('button');
         practiceBtn.textContent = '📝 Latih';
         practiceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
         practiceBtn.onclick = () => startPractice({id: d.id, ...data});
         actions.appendChild(practiceBtn);
 
-        // Butang Edit Tajuk Sahaja
         const editTitleBtn = document.createElement('button');
         editTitleBtn.textContent = '✏️ Tajuk';
         editTitleBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
@@ -393,7 +402,6 @@
         };
         actions.appendChild(editTitleBtn);
 
-        // Butang Edit Ayat Sahaja
         const editSentenceBtn = document.createElement('button');
         editSentenceBtn.textContent = '✏️ Ayat';
         editSentenceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
@@ -406,7 +414,6 @@
         };
         actions.appendChild(editSentenceBtn);
 
-        // Butang Padam
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.className = 'text-xs bg-red-900/50 px-2 py-1 rounded hover:bg-red-800';
