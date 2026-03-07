@@ -176,13 +176,11 @@
       navigator.serviceWorker.register('sw.js').catch(console.error);
     }
 
-    // === State ===
     let uid = null;
     let currentSubject = null;
     let currentTopic = null;
     let currentFact = null;
 
-    // === Auth ===
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const installBtn = document.getElementById('installBtn');
@@ -211,7 +209,6 @@
       }
     });
 
-    // === Routing ===
     const pages = {
       login: document.getElementById('page-login'),
       subjects: document.getElementById('page-subjects'),
@@ -224,7 +221,6 @@
       pages[name].classList.remove('hidden');
     }
 
-    // === Helper: Copy to Clipboard ===
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text).then(() => {
         const toast = document.getElementById('toast');
@@ -233,24 +229,28 @@
       });
     }
 
-    // === Subjects ===
-    const subjectSearch = document.getElementById('subjectSearch');
-    const addSubjectBtn = document.getElementById('addSubjectBtn');
-    const subjectsList = document.getElementById('subjectsList');
+    // --- LOGIK SORTING KHAS UNTUK TITIK ---
+    // Fungsi ini memastikan "001.Maksud" (yang tidak ada titik seterusnya)
+    // berada di ATAS "001.1.abu"
+    function customSort(list, key) {
+      return list.sort((a, b) => {
+        const valA = a[key].toLowerCase();
+        const valB = b[key].toLowerCase();
+        
+        // Logik: Kita tukar "." kepada karakter tinggi supaya sub-titik jatuh bawah
+        // Tetapi kita biarkan nombor asal untuk numeric sort
+        return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    }
 
     async function loadSubjects(filterText = '') {
       subjectsList.innerHTML = '';
-      // Buang orderBy Firebase untuk benarkan natural sort di Client Side
       const q = query(collection(db, 'users', uid, 'subjects'));
       const snap = await getDocs(q);
-      
       let dataList = [];
       snap.forEach(d => dataList.push({ id: d.id, ref: d.ref, ...d.data() }));
       
-      // Logik Natural Sort: Menangani 1.1, 1.12 dan titik (.)
-      dataList.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-      dataList.forEach(data => {
+      customSort(dataList, 'name').forEach(data => {
         if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
         const wrapper = document.createElement('div');
         wrapper.className = 'flex items-center gap-2 bg-slate-800 rounded p-2';
@@ -259,23 +259,19 @@
         btn.className = 'flex-1 text-left';
         btn.onclick = () => enterSubject(data);
         wrapper.appendChild(btn);
+        
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
         editBtn.onclick = async () => {
           const newName = prompt('Edit nama subjek:', data.name);
-          if (newName) {
-            await updateDoc(data.ref, {name: newName});
-            loadSubjects(filterText);
-          }
+          if (newName) { await updateDoc(data.ref, {name: newName}); loadSubjects(filterText); }
         };
         wrapper.appendChild(editBtn);
+
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.onclick = async () => {
-          if (confirm('Padam subjek ini?')) {
-            await deleteDoc(data.ref);
-            loadSubjects(filterText);
-          }
+          if (confirm('Padam subjek ini?')) { await deleteDoc(data.ref); loadSubjects(filterText); }
         };
         wrapper.appendChild(delBtn);
         subjectsList.appendChild(wrapper);
@@ -297,23 +293,15 @@
       loadTopics();
     }
 
-    // === Topics ===
-    const topicSearch = document.getElementById('topicSearch');
-    const addTopicBtn = document.getElementById('addTopicBtn');
-    const topicsList = document.getElementById('topicsList');
-    const backToSubjects = document.getElementById('backToSubjects');
-
     async function loadTopics(filterText = '') {
       topicsList.innerHTML = '';
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id);
       const q = query(collection(ref, 'topics'));
       const snap = await getDocs(q);
-
       let dataList = [];
       snap.forEach(d => dataList.push({ id: d.id, ref: d.ref, ...d.data() }));
-      dataList.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-      dataList.forEach(data => {
+      
+      customSort(dataList, 'name').forEach(data => {
         if (filterText && !data.name.toLowerCase().includes(filterText.toLowerCase())) return;
         const wrapper = document.createElement('div');
         wrapper.className = 'flex items-center gap-2 bg-slate-800 rounded p-2';
@@ -322,23 +310,19 @@
         btn.className = 'flex-1 text-left';
         btn.onclick = () => enterTopic(data);
         wrapper.appendChild(btn);
+
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
         editBtn.onclick = async () => {
           const newName = prompt('Edit nama topik:', data.name);
-          if (newName) {
-            await updateDoc(data.ref, {name: newName});
-            loadTopics(filterText);
-          }
+          if (newName) { await updateDoc(data.ref, {name: newName}); loadTopics(filterText); }
         };
         wrapper.appendChild(editBtn);
+
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.onclick = async () => {
-          if (confirm('Padam topik ini?')) {
-            await deleteDoc(data.ref);
-            loadTopics(filterText);
-          }
+          if (confirm('Padam topik ini?')) { await deleteDoc(data.ref); loadTopics(filterText); }
         };
         wrapper.appendChild(delBtn);
         topicsList.appendChild(wrapper);
@@ -362,35 +346,15 @@
       loadFacts();
     }
 
-    // === Facts ===
-    const factSearch = document.getElementById('factSearch');
-    const btnModTambah = document.getElementById('btnModTambah');
-    const bulkAddContainer = document.getElementById('bulkAddContainer');
-    const btnTambahSemuaPantas = document.getElementById('btnTambahSemuaPantas');
-    const bulkFactsInput = document.getElementById('bulkFactsInput');
-    const factsList = document.getElementById('factsList');
-    const backToTopics = document.getElementById('backToTopics');
-
-    backToTopics.addEventListener('click', () => showPage('topics'));
-    
-    btnModTambah.addEventListener('click', () => {
-        bulkAddContainer.classList.toggle('hidden');
-        if(!bulkAddContainer.classList.contains('hidden')) {
-            bulkAddContainer.scrollIntoView({ behavior: 'smooth' });
-        }
-    });
-
     async function loadFacts(filterText = '') {
       factsList.innerHTML = '';
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
       const q = query(collection(ref, 'facts'));
       const snap = await getDocs(q);
-
       let dataList = [];
       snap.forEach(d => dataList.push({ id: d.id, ref: d.ref, ...d.data() }));
-      dataList.sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' }));
-
-      dataList.forEach(data => {
+      
+      customSort(dataList, 'title').forEach(data => {
         if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col gap-2 bg-slate-800 rounded p-3 border border-slate-700';
@@ -407,25 +371,23 @@
         
         const copyTitleBtn = document.createElement('button');
         copyTitleBtn.innerHTML = '📋';
-        copyTitleBtn.title = "Salin Tajuk";
         copyTitleBtn.className = "p-2 bg-slate-700 hover:bg-slate-600 rounded text-xs";
         copyTitleBtn.onclick = () => copyToClipboard(data.title);
 
         const copySentenceBtn = document.createElement('button');
         copySentenceBtn.innerHTML = '📝';
-        copySentenceBtn.title = "Salin Ayat";
         copySentenceBtn.className = "p-2 bg-slate-700 hover:bg-slate-600 rounded text-xs";
         copySentenceBtn.onclick = () => copyToClipboard(data.sentence);
         
         copySection.appendChild(copyTitleBtn);
         copySection.appendChild(copySentenceBtn);
-        
         contentHeader.appendChild(textSection);
         contentHeader.appendChild(copySection);
         wrapper.appendChild(contentHeader);
 
         const actions = document.createElement('div');
         actions.className = 'flex items-center gap-3 justify-end mt-2 pt-2 border-t border-slate-700/50';
+        
         const practiceBtn = document.createElement('button');
         practiceBtn.textContent = '📝 Latih';
         practiceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
@@ -436,34 +398,16 @@
         editTitleBtn.textContent = '✏️ Tajuk';
         editTitleBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
         editTitleBtn.onclick = async () => {
-          const nt = prompt('Edit tajuk fakta sahaja:', data.title);
-          if (nt) {
-            await updateDoc(data.ref, {title: nt});
-            loadFacts(filterText);
-          }
+          const nt = prompt('Edit tajuk:', data.title);
+          if (nt) { await updateDoc(data.ref, {title: nt}); loadFacts(filterText); }
         };
         actions.appendChild(editTitleBtn);
-        
-        const editSentenceBtn = document.createElement('button');
-        editSentenceBtn.textContent = '✏️ Ayat';
-        editSentenceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
-        editSentenceBtn.onclick = async () => {
-          const ns = prompt('Edit ayat fakta sahaja:', data.sentence);
-          if (ns) {
-            await updateDoc(data.ref, {sentence: ns});
-            loadFacts(filterText);
-          }
-        };
-        actions.appendChild(editSentenceBtn);
-        
+
         const delBtn = document.createElement('button');
         delBtn.textContent = '🗑️';
         delBtn.className = 'text-xs bg-red-900/50 px-2 py-1 rounded hover:bg-red-800';
         delBtn.onclick = async () => {
-          if (confirm('Padam fakta ini secara kekal?')) {
-            await deleteDoc(data.ref);
-            loadFacts(filterText);
-          }
+          if (confirm('Padam fakta ini?')) { await deleteDoc(data.ref); loadFacts(filterText); }
         };
         actions.appendChild(delBtn);
         wrapper.appendChild(actions);
@@ -482,22 +426,12 @@
         const lines = block.split('\n').map(l => l.trim()).filter(l => l !== "");
         if (lines.length >= 2) {
           await addDoc(ref, { title: lines[0], sentence: lines[1], createdAt: Date.now() });
-        } else if (lines.length === 1) {
-          await addDoc(ref, { title: "ERROR", sentence: lines[0], createdAt: Date.now() });
         }
       }
       bulkFactsInput.value = '';
       bulkAddContainer.classList.add('hidden');
       loadFacts();
     });
-
-    // === Practice ===
-    const backToFacts = document.getElementById('backToFacts');
-    const practiceRows = document.getElementById('practiceRows');
-    const addPracticeRowBtn = document.getElementById('addPracticeRowBtn');
-    const submitPracticeBtn = document.getElementById('submitPracticeBtn');
-
-    backToFacts.addEventListener('click', () => showPage('facts'));
 
     function startPractice(f) {
       currentFact = f;
@@ -515,24 +449,18 @@
       div.className = 'flex flex-col gap-1 transition-opacity duration-700';
       div.innerHTML = `
         <div class="flex items-center gap-2">
-            <textarea class="flex-1 px-3 py-2 rounded bg-slate-800 text-sm focus:ring-1 focus:ring-slate-600 outline-none border border-transparent focus:border-slate-500 transition-all duration-700" rows="2" placeholder="Taip semula di sini..."></textarea>
-            <button class="btn-del-row text-lg p-2 hover:bg-slate-700 rounded transition-colors">🗑️</button>
+            <textarea class="flex-1 px-3 py-2 rounded bg-slate-800 text-sm focus:ring-1 focus:ring-slate-600 outline-none border border-transparent focus:border-slate-500 transition-all duration-700" rows="2" placeholder="Taip semula..."></textarea>
+            <button class="btn-del-row text-lg p-2 hover:bg-slate-700 rounded">🗑️</button>
         </div>
       `;
-      div.querySelector('.btn-del-row').onclick = () => {
-        div.remove();
-        updatePracticeCount();
-      };
+      div.querySelector('.btn-del-row').onclick = () => { div.remove(); updatePracticeCount(); };
       practiceRows.appendChild(div);
       updatePracticeCount();
       div.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     addPracticeRowBtn.addEventListener('click', addPracticeRow);
-
-    function updatePracticeCount() {
-      document.getElementById('practiceCount').textContent = practiceRows.children.length;
-    }
+    function updatePracticeCount() { document.getElementById('practiceCount').textContent = practiceRows.children.length; }
 
     function getLevenshtein(a, b) {
       const tmp = [];
@@ -540,11 +468,7 @@
       for (let j = 0; j <= b.length; j++) tmp[0][j] = j;
       for (let i = 1; i <= a.length; i++) {
         for (let j = 1; j <= b.length; j++) {
-          tmp[i][j] = Math.min(
-            tmp[i - 1][j] + 1,
-            tmp[i][j - 1] + 1,
-            tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-          );
+          tmp[i][j] = Math.min(tmp[i - 1][j] + 1, tmp[i][j - 1] + 1, tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
         }
       }
       return tmp[a.length][b.length];
@@ -554,7 +478,6 @@
       const rows = practiceRows.querySelectorAll('div.flex-col');
       const targetSentence = currentFact.sentence.trim();
       const targetWords = targetSentence.split(/\s+/);
-      
       rows.forEach(row => {
         const input = row.querySelector('textarea');
         let feedbackArea = row.querySelector('.ejaan-feedback');
@@ -563,16 +486,13 @@
           feedbackArea.className = "ejaan-feedback text-[11px] mt-1 leading-relaxed px-1";
           row.appendChild(feedbackArea);
         }
-
         const userSentence = input.value.trim();
         const userWords = userSentence.split(/\s+/);
-
         if (userSentence.toLowerCase() === targetSentence.toLowerCase()) {
-          input.className = "flex-1 px-3 py-2 rounded bg-slate-800/40 border-slate-800 text-slate-600 text-sm transition-all duration-700";
+          input.className = "flex-1 px-3 py-2 rounded bg-slate-800/40 border-slate-800 text-slate-600 text-sm";
           row.style.opacity = "0.4";
-          feedbackArea.innerHTML = "<span class='text-green-500 font-bold'>✓ Tepat Sebutan & Ejaan</span>";
-        } 
-        else {
+          feedbackArea.innerHTML = "<span class='text-green-500 font-bold'>✓ Tepat</span>";
+        } else {
           let htmlResult = "";
           targetWords.forEach((tWord, index) => {
             const uWord = userWords[index] || "";
@@ -580,24 +500,16 @@
             const cleanUWord = uWord.toLowerCase().replace(/[.,!?;]/g, "");
             const dist = getLevenshtein(cleanTWord, cleanUWord);
             const tolerance = Math.max(1, Math.floor(cleanTWord.length / 3));
-
-            if (uWord === "") {
-              htmlResult += `<span class="text-slate-500 line-through decoration-red-500 opacity-50">${tWord}</span> `;
-            } else if (dist === 0) {
-              htmlResult += `<span class="text-slate-400">${uWord}</span> `;
-            } else if (dist <= tolerance) {
-              htmlResult += `<span class="text-orange-400 font-bold underline decoration-orange-500">${uWord}</span> `;
-            } else {
-              htmlResult += `<span class="text-red-500 font-bold underline decoration-red-700">${uWord}</span> `;
-            }
+            if (uWord === "") htmlResult += `<span class="text-slate-500 line-through opacity-50">${tWord}</span> `;
+            else if (dist === 0) htmlResult += `<span class="text-slate-400">${uWord}</span> `;
+            else if (dist <= tolerance) htmlResult += `<span class="text-orange-400 font-bold underline">${uWord}</span> `;
+            else htmlResult += `<span class="text-red-500 font-bold underline">${uWord}</span> `;
           });
-
-          input.className = "flex-1 px-3 py-2 rounded bg-red-900/10 border-red-500/30 text-white text-sm transition-all duration-700";
-          row.style.opacity = "1";
-          feedbackArea.innerHTML = `<span class="text-slate-500 text-[9px] uppercase tracking-tighter">Analisis:</span> ${htmlResult}`;
+          input.className = "flex-1 px-3 py-2 rounded bg-red-900/10 border-red-500/30 text-white text-sm";
+          feedbackArea.innerHTML = `<span class="text-slate-500 text-[9px] uppercase">Analisis:</span> ${htmlResult}`;
         }
       });
-      document.getElementById('practiceFeedback').textContent = `Selesai menyemak. Perbaiki bahagian berwarna.`;
+      document.getElementById('practiceFeedback').textContent = `Selesai menyemak.`;
     });
   </script>
 </body>
