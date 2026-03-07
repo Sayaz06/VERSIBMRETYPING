@@ -103,10 +103,15 @@
       <div id="factsList" class="grid gap-2 mb-4"></div>
 
       <div id="bulkAddContainer" class="hidden flex flex-col gap-2 mb-8 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-        <p class="text-xs text-slate-400">Format: Baris 1=Tajuk, Baris 2=Ayat. Selang baris kosong untuk fakta seterusnya.</p>
-        <textarea id="bulkFactsInput" rows="5" placeholder="Contoh:&#10;Kucing&#10;Kucing ada empat kaki&#10;&#10;Ayam&#10;Ayam bertelur" 
-                  class="w-full px-3 py-2 rounded bg-slate-900 text-sm focus:outline-none"></textarea>
-        <button id="btnTambahSemuaPantas" class="w-full py-2 rounded bg-blue-700 hover:bg-blue-600 font-bold text-sm">
+        <div class="flex gap-2 mb-2">
+          <button id="btnWizard" class="flex-1 py-2 bg-blue-900/40 hover:bg-blue-800/60 rounded text-[10px] font-bold border border-blue-700 shadow-sm transition-all uppercase">
+            🔢 PENYUSUN BIJAK (SUB)
+          </button>
+        </div>
+        <p class="text-xs text-slate-400 font-mono">Format: Baris 1=Tajuk, Baris 2=Ayat.</p>
+        <textarea id="bulkFactsInput" rows="5" placeholder="Contoh:&#10;001.Ayam&#10;Ayam bertelur" 
+                  class="w-full px-3 py-2 rounded bg-slate-900 text-sm focus:outline-none border border-slate-700 font-mono"></textarea>
+        <button id="btnTambahSemuaPantas" class="w-full py-2 rounded bg-blue-700 hover:bg-blue-600 font-bold text-sm shadow-lg border border-blue-500 transition-all active:scale-95">
           Proses Masuk Semua
         </button>
       </div>
@@ -359,6 +364,7 @@
     const bulkFactsInput = document.getElementById('bulkFactsInput');
     const factsList = document.getElementById('factsList');
     const backToTopics = document.getElementById('backToTopics');
+    const btnWizard = document.getElementById('btnWizard');
 
     backToTopics.addEventListener('click', () => showPage('topics'));
     
@@ -369,96 +375,130 @@
         }
     });
 
+    // --- LOGIK WIZARD (KEMASKINI) ---
+    btnWizard.onclick = async () => {
+      const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
+      const snap = await getDocs(query(collection(ref, 'facts'), orderBy('title', 'asc')));
+      let items = [];
+      snap.forEach(d => items.push({ title: d.data().title }));
+
+      if (items.length === 0) {
+        const start = prompt("Tiada fakta sedia ada. Masukkan tajuk utama pertama (cth: 001.Ayam):", "001.");
+        if (start) bulkFactsInput.value += `${start}\n(Tulis ayat fakta di sini)\n\n`;
+        return;
+      }
+
+      const choices = items.map((t, i) => `${i+1}. ${t.title}`).join('\n');
+      const choice = prompt(`Pilih rujukan untuk dijadikan SUB:\n${choices}`);
+      if (!choice) return;
+
+      const selected = items[parseInt(choice) - 1];
+      const newLabel = prompt(`Masukkan nama untuk Sub bagi [${selected.title}]:`);
+      if (!newLabel) return;
+
+      // Cari berapa sub yang sudah ada di bawah rujukan ini
+      const subPattern = new RegExp(`^${selected.title.replace(/\./g, '\\.')}\\.\\d+`, 'g');
+      const nextSubIndex = items.filter(it => it.title.match(subPattern)).length + 1;
+
+      const parts = selected.title.split('.');
+      let finalTitle = "";
+      if (parts.length <= 2) {
+          // Kes: 001.Ayam -> 001.1.Abu
+          finalTitle = `${parts[0]}.${nextSubIndex}.${newLabel}`;
+      } else {
+          // Kes: 001.1.Abu -> 001.1.1.Ali
+          const base = selected.title.substring(0, selected.title.lastIndexOf('.'));
+          finalTitle = `${base}.${nextSubIndex}.${newLabel}`;
+      }
+
+      bulkFactsInput.value += `${finalTitle}\n(Ayat fakta baru)\n[TRACE:${selected.title}]\n\n`;
+      bulkFactsInput.focus();
+    };
+
+    // --- PAPARAN FAKTA (WARNA GANAS & TRACE) ---
     async function loadFacts(filterText = '') {
       factsList.innerHTML = '';
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
       const q = query(collection(ref, 'facts'), orderBy('title', 'asc'));
       const snap = await getDocs(q);
+      
       snap.forEach(d => {
         const data = d.data();
         if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
+
+        // Logik Kedalaman Warna (Heatmap)
+        const depth = (data.title.match(/\./g) || []).length;
+        let titleColor = "text-blue-400";
+        let glowClass = "";
+        
+        if (depth === 1) titleColor = "text-green-400"; // Level Asas
+        else if (depth === 2) titleColor = "text-yellow-400"; // Sub 1
+        else if (depth === 3) {
+            titleColor = "text-orange-500"; // Sub 2 (Ganas)
+            glowClass = "drop-shadow-[0_0_3px_rgba(249,115,22,0.4)]";
+        } else if (depth >= 4) {
+            titleColor = "text-red-500"; // Sub 3+ (Sangat Ganas)
+            glowClass = "drop-shadow-[0_0_6px_rgba(239,68,68,0.7)] font-black uppercase";
+        }
+
         const wrapper = document.createElement('div');
-        wrapper.className = 'flex flex-col gap-2 bg-slate-800 rounded p-3 border border-slate-700';
+        wrapper.className = 'flex flex-col gap-2 bg-slate-800/80 rounded-xl p-3 border border-slate-700 shadow-lg mb-1';
         
-        const contentHeader = document.createElement('div');
-        contentHeader.className = 'flex justify-between items-start gap-2';
-        
-        const textSection = document.createElement('div');
-        textSection.className = 'flex-1';
-        textSection.innerHTML = `<div class="font-bold text-blue-400">${data.title}</div><div class="text-sm text-slate-300 italic mt-1">${data.sentence}</div>`;
-        
-        // COPY BUTTONS SECTION
-        const copySection = document.createElement('div');
-        copySection.className = 'flex flex-col gap-2';
-        
-        const copyTitleBtn = document.createElement('button');
-        copyTitleBtn.innerHTML = '📋'; // Copy Tajuk
-        copyTitleBtn.title = "Salin Tajuk";
-        copyTitleBtn.className = "p-2 bg-slate-700 hover:bg-slate-600 rounded text-xs";
-        copyTitleBtn.onclick = () => copyToClipboard(data.title);
+        // Logik "Sub bagi" (Trace)
+        let traceHtml = "";
+        if (data.parentTrace) {
+           const tracePath = data.parentTrace.split('|').map(p => `<span class="text-slate-400 font-medium">${p}</span>`).join(' <span class="text-slate-600 mx-1">»</span> ');
+           traceHtml = `
+             <div class="flex items-center gap-1 mb-1 overflow-x-auto whitespace-nowrap scrollbar-hide">
+               <div class="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700 text-[10px]">
+                 <span class="text-slate-500 mr-1 font-bold italic">Sub bagi:</span> ${tracePath}
+               </div>
+             </div>`;
+        }
 
-        const copySentenceBtn = document.createElement('button');
-        copySentenceBtn.innerHTML = '📝'; // Copy Ayat
-        copySentenceBtn.title = "Salin Ayat";
-        copySentenceBtn.className = "p-2 bg-slate-700 hover:bg-slate-600 rounded text-xs";
-        copySentenceBtn.onclick = () => copyToClipboard(data.sentence);
-        
-        copySection.appendChild(copyTitleBtn);
-        copySection.appendChild(copySentenceBtn);
-        
-        contentHeader.appendChild(textSection);
-        contentHeader.appendChild(copySection);
-        wrapper.appendChild(contentHeader);
+        wrapper.innerHTML = `
+          <div class="flex justify-between items-start gap-2">
+            <div class="flex-1">
+              ${traceHtml}
+              <div class="text-lg font-bold ${titleColor} ${glowClass} tracking-tight">${data.title}</div>
+              <div class="text-sm text-slate-300 italic mt-2 p-2 bg-slate-950/40 rounded border-l-2 border-slate-600">${data.sentence}</div>
+            </div>
+            <div class="flex flex-col gap-2">
+              <button class="cp-t p-2 bg-slate-700 hover:bg-blue-600 rounded text-xs transition-colors shadow-sm">📋</button>
+              <button class="cp-s p-2 bg-slate-700 hover:bg-blue-600 rounded text-xs transition-colors shadow-sm">📝</button>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 justify-end mt-2 pt-2 border-t border-slate-700/40">
+            <button class="prac-btn text-[10px] font-bold bg-blue-600/20 text-blue-300 border border-blue-500/50 px-3 py-1 rounded hover:bg-blue-600 hover:text-white transition-all">Latih</button>
+            <button class="edit-t-btn text-[10px] bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">✏️ Tajuk</button>
+            <button class="edit-s-btn text-[10px] bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">✏️ Ayat</button>
+            <button class="del-btn text-[10px] bg-red-900/30 text-red-400 px-2 py-1 rounded hover:bg-red-800 hover:text-white">🗑️</button>
+          </div>
+        `;
 
-        const actions = document.createElement('div');
-        actions.className = 'flex items-center gap-3 justify-end mt-2 pt-2 border-t border-slate-700/50';
-        const practiceBtn = document.createElement('button');
-        practiceBtn.textContent = '📝 Latih';
-        practiceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
-        practiceBtn.onclick = () => startPractice({id: d.id, ...data});
-        actions.appendChild(practiceBtn);
-        
-        const editTitleBtn = document.createElement('button');
-        editTitleBtn.textContent = '✏️ Tajuk';
-        editTitleBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
-        editTitleBtn.onclick = async () => {
-          const nt = prompt('Edit tajuk fakta sahaja:', data.title);
-          if (nt) {
-            await updateDoc(d.ref, {title: nt});
-            loadFacts(filterText);
-          }
+        // Event Listeners
+        wrapper.querySelector('.cp-t').onclick = () => copyToClipboard(data.title);
+        wrapper.querySelector('.cp-s').onclick = () => copyToClipboard(data.sentence);
+        wrapper.querySelector('.prac-btn').onclick = () => startPractice({id: d.id, ...data});
+        wrapper.querySelector('.edit-t-btn').onclick = async () => {
+          const nt = prompt('Edit tajuk:', data.title);
+          if (nt) { await updateDoc(d.ref, {title: nt}); loadFacts(filterText); }
         };
-        actions.appendChild(editTitleBtn);
-        
-        const editSentenceBtn = document.createElement('button');
-        editSentenceBtn.textContent = '✏️ Ayat';
-        editSentenceBtn.className = 'text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600';
-        editSentenceBtn.onclick = async () => {
-          const ns = prompt('Edit ayat fakta sahaja:', data.sentence);
-          if (ns) {
-            await updateDoc(d.ref, {sentence: ns});
-            loadFacts(filterText);
-          }
+        wrapper.querySelector('.edit-s-btn').onclick = async () => {
+          const ns = prompt('Edit ayat:', data.sentence);
+          if (ns) { await updateDoc(d.ref, {sentence: ns}); loadFacts(filterText); }
         };
-        actions.appendChild(editSentenceBtn);
-        
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '🗑️';
-        delBtn.className = 'text-xs bg-red-900/50 px-2 py-1 rounded hover:bg-red-800';
-        delBtn.onclick = async () => {
-          if (confirm('Padam fakta ini secara kekal?')) {
-            await deleteDoc(d.ref);
-            loadFacts(filterText);
-          }
+        wrapper.querySelector('.del-btn').onclick = async () => {
+          if (confirm('Padam fakta ini?')) { await deleteDoc(d.ref); loadFacts(filterText); }
         };
-        actions.appendChild(delBtn);
-        wrapper.appendChild(actions);
+
         factsList.appendChild(wrapper);
       });
     }
 
     factSearch.addEventListener('input', e => loadFacts(e.target.value));
 
+    // --- PROSES SIMPAN (KEMASKINI UNTUK TRACE) ---
     btnTambahSemuaPantas.addEventListener('click', async () => {
       const text = bulkFactsInput.value.trim();
       if (!text) return;
@@ -467,9 +507,22 @@
       for (const block of blocks) {
         const lines = block.split('\n').map(l => l.trim()).filter(l => l !== "");
         if (lines.length >= 2) {
-          await addDoc(ref, { title: lines[0], sentence: lines[1], createdAt: Date.now() });
-        } else if (lines.length === 1) {
-          await addDoc(ref, { title: "ERROR", sentence: lines[0], createdAt: Date.now() });
+          let title = lines[0];
+          let sentence = lines[1];
+          let parentTrace = "";
+          
+          // Cari jika ada arahan TRACE dari Wizard
+          const traceIdx = lines.findIndex(l => l.startsWith('[TRACE:'));
+          if (traceIdx !== -1) {
+             parentTrace = lines[traceIdx].replace('[TRACE:', '').replace(']', '');
+          }
+
+          await addDoc(ref, { 
+            title: title, 
+            sentence: sentence, 
+            parentTrace: parentTrace,
+            createdAt: Date.now() 
+          });
         }
       }
       bulkFactsInput.value = '';
@@ -477,7 +530,7 @@
       loadFacts();
     });
 
-    // === Practice ===
+    // === Practice (KEKAL SKRIP ASAL) ===
     const backToFacts = document.getElementById('backToFacts');
     const practiceRows = document.getElementById('practiceRows');
     const addPracticeRowBtn = document.getElementById('addPracticeRowBtn');
