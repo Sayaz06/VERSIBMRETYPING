@@ -453,10 +453,12 @@
 
     function addPracticeRow() {
       const div = document.createElement('div');
-      div.className = 'flex items-center gap-2 transition-opacity duration-700';
+      div.className = 'flex flex-col gap-1 transition-opacity duration-700';
       div.innerHTML = `
-        <textarea class="flex-1 px-3 py-2 rounded bg-slate-800 text-sm focus:ring-1 focus:ring-slate-600 outline-none border border-transparent focus:border-slate-500 transition-all duration-700" rows="2" placeholder="Taip semula di sini..."></textarea>
-        <button class="btn-del-row text-lg p-2 hover:bg-slate-700 rounded transition-colors">🗑️</button>
+        <div class="flex items-center gap-2">
+            <textarea class="flex-1 px-3 py-2 rounded bg-slate-800 text-sm focus:ring-1 focus:ring-slate-600 outline-none border border-transparent focus:border-slate-500 transition-all duration-700" rows="2" placeholder="Taip semula di sini..."></textarea>
+            <button class="btn-del-row text-lg p-2 hover:bg-slate-700 rounded transition-colors">🗑️</button>
+        </div>
       `;
       div.querySelector('.btn-del-row').onclick = () => {
         div.remove();
@@ -473,7 +475,7 @@
       document.getElementById('practiceCount').textContent = practiceRows.children.length;
     }
 
-    // --- Fungsi Bantuan: Kira Jarak Ejaan ---
+    // --- Fungsi Bantuan: Kira Jarak Ejaan (Levenshtein) ---
     function getLevenshtein(a, b) {
       const tmp = [];
       for (let i = 0; i <= a.length; i++) tmp[i] = [i];
@@ -491,34 +493,64 @@
     }
 
     submitPracticeBtn.addEventListener('click', () => {
-      const rows = practiceRows.querySelectorAll('div');
-      const targetAyat = currentFact.sentence.trim().toLowerCase();
-      let tepat = 0;
-      let typo = 0;
+      const rows = practiceRows.querySelectorAll('div.flex-col');
+      const targetSentence = currentFact.sentence.trim();
+      const targetWords = targetSentence.split(/\s+/);
+      let totalTepat = 0;
       
       rows.forEach(row => {
         const input = row.querySelector('textarea');
-        const jawapanUser = input.value.trim().toLowerCase();
-        
-        const jarak = getLevenshtein(targetAyat, jawapanUser);
-        const limitTypo = Math.max(1, Math.floor(targetAyat.length / 15));
+        // Buat atau cari kawasan maklum balas bawah kotak taip
+        let feedbackArea = row.querySelector('.ejaan-feedback');
+        if (!feedbackArea) {
+          feedbackArea = document.createElement('div');
+          feedbackArea.className = "ejaan-feedback text-[11px] mt-1 leading-relaxed px-1";
+          row.appendChild(feedbackArea);
+        }
 
-        if (jarak === 0) {
-          tepat++;
+        const userSentence = input.value.trim();
+        const userWords = userSentence.split(/\s+/);
+
+        // KES 1: TEPAT 100%
+        if (userSentence.toLowerCase() === targetSentence.toLowerCase()) {
+          totalTepat++;
           input.className = "flex-1 px-3 py-2 rounded bg-slate-800/40 border-slate-800 text-slate-600 text-sm transition-all duration-700";
           row.style.opacity = "0.4";
-        } 
-        else if (jarak <= limitTypo) {
-          typo++;
-          input.className = "flex-1 px-3 py-2 rounded bg-orange-900/20 border-orange-800/30 text-orange-200/50 text-sm transition-all duration-700";
-          row.style.opacity = "0.6";
+          feedbackArea.innerHTML = "<span class='text-green-500 font-bold'>✓ Tepat Sebutan & Ejaan</span>";
         } 
         else {
-          input.className = "flex-1 px-3 py-2 rounded bg-red-900/30 border-red-500 text-white text-sm transition-all duration-700";
+          // KES 2: ADA SALAH / TYPO - ANALISIS PERKATAAN
+          let htmlResult = "";
+          
+          targetWords.forEach((tWord, index) => {
+            const uWord = userWords[index] || "";
+            const cleanTWord = tWord.toLowerCase().replace(/[.,!?;]/g, "");
+            const cleanUWord = uWord.toLowerCase().replace(/[.,!?;]/g, "");
+            
+            const dist = getLevenshtein(cleanTWord, cleanUWord);
+            const tolerance = Math.max(1, Math.floor(cleanTWord.length / 3));
+
+            if (uWord === "") {
+              // Tertinggal perkataan
+              htmlResult += `<span class="text-slate-500 line-through decoration-red-500 opacity-50">${tWord}</span> `;
+            } else if (dist === 0) {
+              // Betul
+              htmlResult += `<span class="text-slate-400">${uWord}</span> `;
+            } else if (dist <= tolerance) {
+              // Typo (Oren)
+              htmlResult += `<span class="text-orange-400 font-bold underline decoration-orange-500">${uWord}</span> `;
+            } else {
+              // Salah terus (Merah)
+              htmlResult += `<span class="text-red-500 font-bold underline decoration-red-700">${uWord}</span> `;
+            }
+          });
+
+          input.className = "flex-1 px-3 py-2 rounded bg-red-900/10 border-red-500/30 text-white text-sm transition-all duration-700";
           row.style.opacity = "1";
+          feedbackArea.innerHTML = `<span class="text-slate-500 text-[9px] uppercase tracking-tighter">Analisis:</span> ${htmlResult}`;
         }
       });
-      document.getElementById('practiceFeedback').textContent = `Hasil: ${tepat} Tepat | ${typo} Typo | ${rows.length - (tepat+typo)} Salah`;
+      document.getElementById('practiceFeedback').textContent = `Selesai menyemak ${rows.length} ulangan. Perbaiki bahagian berwarna.`;
     });
   </script>
 </body>
