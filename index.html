@@ -136,7 +136,7 @@
 
       <button id="addPracticeRowBtn" 
               class="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-slate-700 hover:bg-slate-600 
-                     flex items-center justify-center shadow-2xl z-30 border-2 border-slate-500 text-2xl font-bold">
+                      flex items-center justify-center shadow-2xl z-30 border-2 border-slate-500 text-2xl font-bold">
         +
       </button>
     </section>
@@ -562,6 +562,7 @@
           let htmlResult = "";
           targetWords.forEach((tWord, index) => {
             const uWord = userWords[index] || "";
+            // Menukar kedua-dua perkataan ke huruf kecil sebelum perbandingan
             const cleanTWord = tWord.toLowerCase().replace(/[.,!?;]/g, "");
             const cleanUWord = uWord.toLowerCase().replace(/[.,!?;]/g, "");
             const dist = getLevenshtein(cleanTWord, cleanUWord);
@@ -570,6 +571,7 @@
             if (uWord === "") {
               htmlResult += `<span class="text-slate-500 line-through decoration-red-500 opacity-50">${tWord}</span> `;
             } else if (dist === 0) {
+              // Jika jarak adalah 0 (selepas lowercase), ia dianggap betul
               htmlResult += `<span class="text-slate-400">${uWord}</span> `;
             } else if (dist <= tolerance) {
               htmlResult += `<span class="text-orange-400 font-bold underline decoration-orange-500">${uWord}</span> `;
