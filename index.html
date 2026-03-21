@@ -152,8 +152,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } 
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    // [MODIFIKASI] Menambah setDoc dan getDoc untuk fungsi simpan last read
-    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, enableIndexedDbPersistence, setDoc, getDoc } 
+    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, enableIndexedDbPersistence } 
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -372,20 +371,9 @@
 
     async function loadFacts(filterText = '') {
       factsList.innerHTML = '';
-      
-      // [MODIFIKASI] Ambil rekod ayat terakhir dibaca dari Firebase
-      let lastReadFactId = null;
-      try {
-        const lrSnap = await getDoc(doc(db, 'users', uid, 'settings', 'lastRead'));
-        if (lrSnap.exists() && lrSnap.data().topicId === currentTopic.id) {
-          lastReadFactId = lrSnap.data().factId;
-        }
-      } catch(e) { console.warn("Tidak dapat memuatkan last read", e); }
-
       const ref = doc(db, 'users', uid, 'subjects', currentSubject.id, 'topics', currentTopic.id);
       const q = query(collection(ref, 'facts'), orderBy('title', 'asc'));
       const snap = await getDocs(q);
-      
       snap.forEach(d => {
         const data = d.data();
         if (filterText && !data.title.toLowerCase().includes(filterText.toLowerCase())) return;
@@ -395,56 +383,9 @@
         const contentHeader = document.createElement('div');
         contentHeader.className = 'flex justify-between items-start gap-2';
         
-        // [MODIFIKASI] Logik Double Tap dan Highlight eksklusif
         const textSection = document.createElement('div');
-        textSection.className = 'flex-1 cursor-pointer'; // Cursor pointer supaya tahu boleh klik
-        
-        // Semak jika fakta ini adalah yang terakhir dibaca
-        const isLastRead = (d.id === lastReadFactId);
-        const highlightClasses = isLastRead 
-            ? 'bg-yellow-500/30 text-yellow-100 p-1.5 rounded border border-yellow-500/50' 
-            : 'text-slate-300 p-1.5 border border-transparent';
-
-        textSection.innerHTML = `
-          <div class="font-bold text-blue-400">${data.title}</div>
-          <div class="fact-sentence-text text-sm italic mt-1 transition-all duration-300 ${highlightClasses}" data-fact-id="${d.id}">
-            ${data.sentence}
-          </div>
-        `;
-
-        // Pengesan Ketik Dua Kali (Double Tap Manual supaya serasi dengan semua telefon)
-        let lastClickTime = 0;
-        textSection.addEventListener('click', async (e) => {
-            const currentTime = new Date().getTime();
-            const timeDiff = currentTime - lastClickTime;
-            
-            if (timeDiff < 400 && timeDiff > 0) { // Jika diketik 2 kali dalam masa 400ms
-                const sentenceEl = textSection.querySelector('.fact-sentence-text');
-                
-                // 1. Padam highlight pada SEMUA ayat lain
-                document.querySelectorAll('.fact-sentence-text').forEach(el => {
-                    el.classList.remove('bg-yellow-500/30', 'text-yellow-100', 'rounded', 'border', 'border-yellow-500/50');
-                    el.classList.add('text-slate-300', 'border-transparent');
-                });
-                
-                // 2. Tambah highlight pada ayat yang sedang diketik
-                sentenceEl.classList.remove('text-slate-300', 'border-transparent');
-                sentenceEl.classList.add('bg-yellow-500/30', 'text-yellow-100', 'rounded', 'border', 'border-yellow-500/50');
-                
-                // 3. Simpan ke Firebase supaya boleh resume nanti di device lain
-                try {
-                    await setDoc(doc(db, 'users', uid, 'settings', 'lastRead'), {
-                        subjectId: currentSubject.id,
-                        topicId: currentTopic.id,
-                        factId: d.id,
-                        timestamp: Date.now()
-                    });
-                } catch (err) {
-                    console.error("Gagal simpan rekod last read:", err);
-                }
-            }
-            lastClickTime = currentTime;
-        });
+        textSection.className = 'flex-1';
+        textSection.innerHTML = `<div class="font-bold text-blue-400">${data.title}</div><div class="text-sm text-slate-300 italic mt-1">${data.sentence}</div>`;
         
         // COPY BUTTONS SECTION
         const copySection = document.createElement('div');
@@ -514,14 +455,6 @@
         wrapper.appendChild(actions);
         factsList.appendChild(wrapper);
       });
-
-      // [MODIFIKASI] Auto-Scroll ke ayat yang dihighlight selepas senarai selesai dimuatkan
-      setTimeout(() => {
-        const highlighted = factsList.querySelector('.bg-yellow-500\\/30');
-        if (highlighted) {
-          highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 300);
     }
 
     factSearch.addEventListener('input', e => loadFacts(e.target.value));
