@@ -1,5 +1,5 @@
 // Nama cache
-const CACHE_NAME = 'VERSIBMRETYPING-v1';
+const CACHE_NAME = 'VERSIBMRETYPING-v2';
 
 // Fail yang diprecache (shell app) — ikut base path GitHub Pages
 const PRECACHE = [
